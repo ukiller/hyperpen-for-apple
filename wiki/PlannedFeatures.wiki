@@ -1,4 +1,4 @@
-Features for the planned releases
+Planned features for the coming releases (10/22/2011)
 
 = Introduction =
 
@@ -11,3 +11,4 @@ The following features are on my list for the coming release:
     * defining macro keys
   * synthesize tablet status changes via macro keys
     * x,y tilt
+  * simulate keypresses
