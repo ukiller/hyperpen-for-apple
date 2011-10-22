@@ -1,11 +1,41 @@
-/*
- *  aiptek.h
- *  hyperpenDaemon
- *
- *  Created by Paar on 21.10.11.
- *  Copyright 2011 Udo Killermann. All rights reserved.
- *
+/* 
+ (c) Udo Killermann 2011
+ 
+ Tablet State and Event Processing taken in major parts from
+ Tablet Magic Daemon Sources (c) 2011 Thinkyhead Software
+ 
+ Aiptek Report Decoding and Command Codes taken from Linux 2.6
+ Kernel Driver aiptek.c
+ --
+ Copyright (c) 2001      Chris Atenasio   <chris@crud.net>
+ Copyright (c) 2002-2004 Bryan W. Headley <bwheadley@earthlink.net>
+ 
+ based on wacom.c by
+ Vojtech Pavlik      <vojtech@suse.cz>
+ Andreas Bach Aaen   <abach@stofanet.dk>
+ Clifford Wolf       <clifford@clifford.at>
+ Sam Mosel           <sam.mosel@computer.org>
+ James E. Blair      <corvus@gnu.org>
+ Daniel Egger        <egger@suse.de>
+ --
+ 
+ LICENSE
+ 
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Library General Public
+ License as published by the Free Software Foundation; either
+ version 3 of the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Library General Public License for more details.
+ 
+ You should have received a copy of the GNU Library General Public
+ License along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
 
 /*
  * Aiptek status packet:
@@ -33,7 +63,7 @@
  * (returned as Report 3 - absolute coordinates from the mouse)
  *
  *        bit7  bit6  bit5  bit4  bit3  bit2  bit1  bit0
- * byte0   0     0     0     0     0     0     1     0
+ * byte0   0     0     0     0     0     0     1     1
  * byte1  X7    X6    X5    X4    X3    X2    X1    X0
  * byte2  X15   X14   X13   X12   X11   X10   X9    X8
  * byte3  Y7    Y6    Y5    Y4    Y3    Y2    Y1    Y0
@@ -55,7 +85,7 @@
  * (returned as Report 5 - macrokeys from the mouse)
  *
  *        bit7  bit6  bit5  bit4  bit3  bit2  bit1  bit0
- * byte0   0     0     0     0     0     1     0     0
+ * byte0   0     0     0     0     0     1     0     1
  * byte1   0     0     0    BS2   BS    Tip   IR    DV
  * byte2   0     0     0     0     0     0     1     0
  * byte3   0     0     0    K4    K3    K2    K1    K0

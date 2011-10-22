@@ -1,3 +1,41 @@
+/* 
+ (c) Udo Killermann 2011
+ 
+ Tablet State and Event Processing taken in major parts from
+ Tablet Magic Daemon Sources (c) 2011 Thinkyhead Software
+ 
+ Aiptek Report Decoding and Command Codes taken from Linux 2.6
+ Kernel Driver aiptek.c
+ --
+ Copyright (c) 2001      Chris Atenasio   <chris@crud.net>
+ Copyright (c) 2002-2004 Bryan W. Headley <bwheadley@earthlink.net>
+ 
+ based on wacom.c by
+ Vojtech Pavlik      <vojtech@suse.cz>
+ Andreas Bach Aaen   <abach@stofanet.dk>
+ Clifford Wolf       <clifford@clifford.at>
+ Sam Mosel           <sam.mosel@computer.org>
+ James E. Blair      <corvus@gnu.org>
+ Daniel Egger        <egger@suse.de>
+ --
+ 
+ LICENSE
+ 
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Library General Public
+ License as published by the Free Software Foundation; either
+ version 3 of the License, or (at your option) any later version.
+ 
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Library General Public License for more details.
+ 
+ You should have received a copy of the GNU Library General Public
+ License along with this program; if not, write to the Free Software
+ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -31,6 +69,13 @@
 #include "stylus.h"		// structures and constants needed for TabletMagic's functions to work
 #include "aiptek.h"		// background information needed to understand tablet's reports and
 						// functions - taken from Linux' kernel driver
+
+// Aiptek
+#define VendorID  0x08ca
+
+// HyperPen 12000U
+#define ProductID 0x0010
+
 
 void PostNXEvent(int eventType, SInt16 eventSubType, UInt8 otherButton);
 void PostChangeEvents();
@@ -947,17 +992,14 @@ int main (int argc, const char * argv[]) {
 	CFNumberRef vendorID;
 	CFNumberRef productID;
 	
-	CFSetRef matchingDeviceSet;
-
-	
-	CFArrayRef matchingElements;
 	
 	UInt32 vendor;
 	UInt32 product;
 
 // Aiptek HyperPen 12000U
-	product=0x0010;
-	vendor=0x08ca;
+// taken from the top defines
+	product=ProductID;
+	vendor=VendorID;
 	
 	ioHidManager=IOHIDManagerCreate(kIOHIDOptionsTypeNone,0);
 	
