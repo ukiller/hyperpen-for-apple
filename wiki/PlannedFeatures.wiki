@@ -1,0 +1,13 @@
+Features for the planned releases
+
+= Introduction =
+
+The following features are on my list for the coming release:
+  * command line arguments
+    * vendor and product ids to support other tablet models as well
+    * active tablet bounds and extension
+  * gui to query and set tablet status and other parameters (as seen in tablet magic)
+    * switch between mouse and tablet mode
+    * defining macro keys
+  * synthesize tablet status changes via macro keys
+    * x,y tilt
