@@ -1,0 +1,6 @@
+Short information about the tablet and motivation to write a userland driver for OSX.
+
+= Introduction =
+
+The 12000U is a (legacy) entry level tablet by [http://www.aiptek.eu Aiptek]. Drivers are provided for Windows Systems and older versions of OSX (even OS9!). But I had a hard time to find a driver that would run with 10.6. Google led me to some obscure pages that claimed to have the latest drivers and so I wasted a lot of time to no avail.  
+
