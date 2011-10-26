@@ -80,6 +80,8 @@
 void PostNXEvent(int eventType, SInt16 eventSubType, UInt8 otherButton);
 void PostChangeEvents();
 
+IOHIDDeviceRef currentDeviceRef=NULL;
+
 // the following sequences are sent to the tablet to set it into absolute tablet mode with
 // macrokey support - setting these commands is done with IOHIDSetReport
 // unfortunately IOHIDGetReport doesn't work as expected so at the moment I refrain to query 
@@ -106,6 +108,10 @@ const uint8_t TIPmask=0x04;
 const uint8_t BS1mask=0x08;
 const uint8_t BS2mask=0x10;
 
+const uint8_t relTIPmask=0x01;
+const uint8_t relBS1mask=0x02;
+const uint8_t relBS2mask=0x04;
+
 uint8_t buffer[32];
 mach_port_t		io_master_port;		//!< The master port for HID events
 io_connect_t	gEventDriver;		//!< The connection by which HID events are sent
@@ -131,8 +137,8 @@ int		button_mapping[] = { kSystemButton1, kSystemButton1, kSystemButton2, kSyste
 
 
 // satisfying some needs of tabletMagic's code
-bool mouse_mode=FALSE;
-bool mouse_scaling;
+bool mouse_mode;
+int mouse_scaling=1;
 bool tablet_on=TRUE;
 
 // naming the buttons to do some debugging
@@ -151,6 +157,7 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 // unschedule events fired by the device from run loop
 void theDeviceRemovalCallback (void *context, IOReturn result, void *sender, IOHIDDeviceRef device)
 {
+	currentDeviceRef=NULL;
 	IOHIDDeviceUnscheduleFromRunLoop( device, CFRunLoopGetCurrent( ), kCFRunLoopDefaultMode );
 	fprintf(stderr,"Tablet removed!\n");
 }
@@ -172,10 +179,13 @@ void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSende
 {
 	IOReturn ioReturn;
 	
+	currentDeviceRef=inIOHIDDeviceRef;
+	
 	// initialize the tablet to get it going
 	
 	// turn on digitizer mode
 	ioReturn=issueCommand(inIOHIDDeviceRef, switchToTablet);
+	mouse_mode=FALSE;
 	
 	// turn on macro key mode
 	ioReturn=issueCommand(inIOHIDDeviceRef, enableMacroKeys);
@@ -273,6 +283,30 @@ void handleAbsoluteReport(uint8_t * inReport)
 	
 }
 
+/***********************************************************************
+ * Relative reports deliver values in 2's complement format to
+ * deal with negative offsets.
+ */
+static int aiptek_convert_from_2s_complement(uint8_t c)
+{
+	int ret;
+	uint8_t b = c;
+	int negate = 0;
+	
+	// printf("\t\t%x",c);
+	if ((b & 0x80) != 0) {
+		// b = b & 0x80;
+		b--;
+		b = ~b;
+		
+		negate = 1;
+	}
+	ret = b;
+	ret = (negate == 1) ? -ret : ret;
+	// printf("\t%x\n",b);
+	return ret;
+}
+
 // event pump enters here
 // callback is registered with the Aiptek tablet device
 // packet decoding is based on information provided in Linux's
@@ -282,18 +316,51 @@ void handleAbsoluteReport(uint8_t * inReport)
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
 								   uint32_t reportID, uint8_t *inReport, CFIndex length)
 {	
-	int xCoord;
-	int yCoord;
+	int deltaX;
+	int deltaY;
+	UInt16	bm = 0; // button mask
 	
 	static uint8_t key; // macro key handling
 		
 	switch (reportID) {
 		case kRelativePointer:
-			xCoord=inReport[2];
-			yCoord=inReport[3];
+			ResetButtons;
+			deltaX=aiptek_convert_from_2s_complement(inReport[2]);
 			
-			printf("xCoord: %d\n",xCoord);
-			printf("yCoord: %d\n",yCoord);
+			printf("delta X: %d\n",deltaX);
+			
+			deltaY=aiptek_convert_from_2s_complement(inReport[3]);
+
+			
+	
+			printf("delta Y: %d\n",deltaY);
+			
+			stylus.old.x=stylus.point.x;
+			stylus.old.y=stylus.point.y;
+			
+			stylus.point.x=stylus.old.x+deltaX;
+			stylus.point.y=stylus.old.y+deltaY;
+			
+			stylus.motion.x=deltaX;
+			stylus.motion.y=deltaY;
+			
+			if (inReport[1] & relTIPmask) {
+				bm|=kBitStylusTip;
+			}
+			
+			if (inReport[1] & relBS1mask) {
+				bm|=kBitStylusButton1;
+			}
+			
+			if (inReport[1] & relBS2mask) {
+				bm|=kBitStylusButton2;
+			}
+			
+			// set the button state in the current stylus state
+			SetButtons(bm);
+			
+			PostChangeEvents();
+			
 			break;
 			
 		case kAbsoluteStylus:
@@ -321,6 +388,22 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 				if (inReport[3]/2==key) {
 					printf("%s\n",buttonNames[key]);
 					key=99;	// reset state
+					switch (inReport[3]/2) {
+						case 23:
+							issueCommand(currentDeviceRef, switchToMouse);
+							mouse_mode=TRUE;
+							stylus.point.x=3000;
+							stylus.point.y=2250;
+							
+							
+							stylus.off_tablet = FALSE;
+							break;
+						case 24:
+							issueCommand(currentDeviceRef, switchToTablet);
+							break;
+						default:
+							break;
+					}
 				}
 			}
 
@@ -494,15 +577,7 @@ void PostChangeEvents() {
 		 tx1, ty1, tx2, ty2,
 		 hratio, vratio, mouse_scaling);
 		
-		 fprintf(stderr,  "Current Pos: %d %d | Old Pos: %d %d | Motion: %d %d | Scr Pos: %.2f %.2f  |  Old Scr Pos: %.2f %.2f\n\n",
-				 stylus.point.x, stylus.point.y,
-				 stylus.old.x,stylus.old.y,
-				 stylus.motion.x, stylus.motion.y,
-				 stylus.oldPos.x, stylus.oldPos.y,
-				 stylus.scrPos.x, stylus.scrPos.y);
-				 
-		 /**/
-		
+		 		
 		// Apply the tablet:screen ratio to the amount of motion
 		// (because it's usually a sane value)
 		//
@@ -519,6 +594,16 @@ void PostChangeEvents() {
 		
 		stylus.scrPos.x = (SInt16)nx + screenBounds.origin.x;
 		stylus.scrPos.y = (SInt16)ny + screenBounds.origin.y;
+		
+		fprintf(stderr,  "Current Pos: %d %d | Old Pos: %d %d | Motion: %d %d | Scr Pos: %.2f %.2f  |  Old Scr Pos: %.2f %.2f\n\n",
+				stylus.point.x, stylus.point.y,
+				stylus.old.x,stylus.old.y,
+				stylus.motion.x, stylus.motion.y,
+				stylus.oldPos.x, stylus.oldPos.y,
+				stylus.scrPos.x, stylus.scrPos.y);
+		
+		/**/
+		
 	}
 	else {
 		
@@ -723,7 +808,7 @@ void PostNXEvent(int eventType, SInt16 eventSubType, UInt8 otherButton) {
 			eventData.mouse.subType = eventSubType;
 			eventData.mouse.subx = 0;
 			eventData.mouse.suby = 0;
-			eventData.mouse.pressure = 0; // uki fixing the pressure problem
+			eventData.mouse.pressure = stylus.pressure; 
 			
 #if LOG_STREAM_TO_FILE
 			if (logfile) fprintf(logfile, " | UP/DOWN | pressure=%u", stylus.pressure);
