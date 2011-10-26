@@ -344,13 +344,20 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 			stylus.motion.x=deltaX;
 			stylus.motion.y=deltaY;
 			
+			printf("\t\tbutton state: %x",inReport[1]);
+			
+			
 			if (inReport[1] & relTIPmask) {
 				bm|=kBitStylusTip;
 			}
 			
+			// my mouse doesn't support the middle button in relative mode, so I've to 
+			// hack the right mouse to behave like it should - I map both none left
+			// mouse buttons to StylusButton2
 			if (inReport[1] & relBS1mask) {
-				bm|=kBitStylusButton1;
+				bm|=kBitStylusButton2;
 			}
+
 			
 			if (inReport[1] & relBS2mask) {
 				bm|=kBitStylusButton2;
@@ -378,6 +385,8 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 #ifdef DEBUG
 			puts("\tMouse\n");
 #endif
+			PostChangeEvents();
+			
 			break;
 			
 		case kMacroStylus:
@@ -388,18 +397,20 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 				if (inReport[3]/2==key) {
 					printf("%s\n",buttonNames[key]);
 					key=99;	// reset state
+					// use soft keys to do some changes to the tablet's state
 					switch (inReport[3]/2) {
 						case 23:
 							issueCommand(currentDeviceRef, switchToMouse);
 							mouse_mode=TRUE;
 							stylus.point.x=3000;
 							stylus.point.y=2250;
-							
-							
 							stylus.off_tablet = FALSE;
+							puts("switching to mouse (relative) mode");
 							break;
 						case 24:
 							issueCommand(currentDeviceRef, switchToTablet);
+							stylus.off_tablet = TRUE;
+							mouse_mode=FALSE;
 							break;
 						default:
 							break;
