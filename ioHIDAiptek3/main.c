@@ -108,6 +108,8 @@ const uint8_t TIPmask=0x04;
 const uint8_t BS1mask=0x08;
 const uint8_t BS2mask=0x10;
 
+// button mapping is different if we are running the tablet in relative
+// mode (aka mouse mode)
 const uint8_t relTIPmask=0x01;
 const uint8_t relBS1mask=0x02;
 const uint8_t relBS2mask=0x04;
@@ -153,6 +155,7 @@ char * buttonNames[] = {"dummy","button 1","button 2","button 3","button 4","but
 // forward declare
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
 								   uint32_t reportID, uint8_t *inReport, CFIndex length);
+void InitTabletBounds(SInt32 x1, SInt32 y1, SInt32 x2, SInt32 y2);
 
 // unschedule events fired by the device from run loop
 void theDeviceRemovalCallback (void *context, IOReturn result, void *sender, IOHIDDeviceRef device)
@@ -399,6 +402,15 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 					key=99;	// reset state
 					// use soft keys to do some changes to the tablet's state
 					switch (inReport[3]/2) {
+						case 21:
+							InitTabletBounds(0, 0, 3000, 2250);
+							puts("shrinking tablet bounds");
+							break;
+						case 22:
+							InitTabletBounds(0, 0, 6000, 4500);
+							puts("resetting tablet bounds");
+							break;
+
 						case 23:
 							issueCommand(currentDeviceRef, switchToMouse);
 							mouse_mode=TRUE;
@@ -463,8 +475,8 @@ void ShortSleep2() {
 void InitTabletBounds(SInt32 x1, SInt32 y1, SInt32 x2, SInt32 y2) {
 	tabletMapping.origin.x = (x1 != -1) ? x1 : 0;
 	tabletMapping.origin.y = (y1 != -1) ? y1 : 0;
-	tabletMapping.size.width = (x2 != -1) ? (x2 - tabletMapping.origin.x + 1) : 5800;
-	tabletMapping.size.height = (y2 != -1) ? (y2 - tabletMapping.origin.y + 1) : 4300;
+	tabletMapping.size.width = (x2 != -1) ? (x2 - tabletMapping.origin.x + 1) : 6000;
+	tabletMapping.size.height = (y2 != -1) ? (y2 - tabletMapping.origin.y + 1) : 4500;
 	
 }
 
@@ -1125,7 +1137,7 @@ int main (int argc, const char * argv[]) {
 		
 		ioReturn=OpenHIDService();
 		InitStylus();
-		InitTabletBounds(140, 0, 5900, 4500);
+		InitTabletBounds(0, 0, 6000, 4500);
 		UpdateDisplaysBounds();
 		SetScreenMapping(0,0,-1,-1);
 		
