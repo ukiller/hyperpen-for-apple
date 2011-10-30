@@ -166,7 +166,9 @@ void theDeviceRemovalCallback (void *context, IOReturn result, void *sender, IOH
 }
 
 // issueCommand()
-// instructs the tablet execute a specific command
+// instructs the tablet to execute a specific command
+// it's a convenience function, so I don't have to write down the SetReport everytime
+// I need to access it
 IOReturn issueCommand(IOHIDDeviceRef deviceRef, uint8_t * command)
 {
 	return IOHIDDeviceSetReport( deviceRef,
@@ -176,8 +178,11 @@ IOReturn issueCommand(IOHIDDeviceRef deviceRef, uint8_t * command)
 								3);
 }
 
+// theDeviceMatchingTablet() is called as soon as either a device is already plugged in when the
+// application is starting or the device is connected while the application is running
+//
 // initialize the matching device (aiptek tablet) and register the event handler with the run loop
-// afterward input reports will be send to this event handler 
+// afterwards input reports will be send to this event handler 
 void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSender, IOHIDDeviceRef  inIOHIDDeviceRef)
 {
 	IOReturn ioReturn;
@@ -213,9 +218,18 @@ void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSende
 }
 
 
-// handle absolute report is the entry point for processing the
+// handleAbsoluteReport() is the entry point for processing the
 // digitizer information if running in absolute mode
-
+//
+// it takes the HID devices' raw report and interprets it according
+// to the report definition
+// 
+// starting byte can be ignored this has alreday been processed by
+// the HID report callback (otherwise we wouldn't have ended here)
+//
+// essantially this routine converts the raw information received by the Aiptek Tablet
+// to the logical tablet and stylus state represented by TabletMagic's code
+//
 void handleAbsoluteReport(uint8_t * inReport)
 {
 	int xCoord;
@@ -254,7 +268,7 @@ void handleAbsoluteReport(uint8_t * inReport)
 	stylus.motion.y = stylus.point.y - stylus.old.y; // point und old werden in tablet koordinaten übertragen
 	
 	
-	// constraint tip pressure to 511 (9 Bit)	
+	// constrain tip pressure to 511 (9 Bit)	
 	
 	tipPressure=(tipPressure>511)?511:tipPressure;
 	
@@ -263,6 +277,8 @@ void handleAbsoluteReport(uint8_t * inReport)
 	stylus.pressure=tipPressure<<7; 
 	
 	// reconstruct the button state
+	// button state is or'ed together using the corresponding bit masks
+	
 	if (inReport[5] & TIPmask) {
 		bm|=kBitStylusTip;
 	}
@@ -286,19 +302,17 @@ void handleAbsoluteReport(uint8_t * inReport)
 	
 }
 
-/***********************************************************************
- * Relative reports deliver values in 2's complement format to
- * deal with negative offsets.
- */
+
+// 
+// Relative reports (mouse mode) deliver values in 2's complement format to
+// deal with negative offsets.
 static int aiptek_convert_from_2s_complement(uint8_t c)
 {
 	int ret;
 	uint8_t b = c;
 	int negate = 0;
 	
-	// printf("\t\t%x",c);
 	if ((b & 0x80) != 0) {
-		// b = b & 0x80;
 		b--;
 		b = ~b;
 		
@@ -306,7 +320,6 @@ static int aiptek_convert_from_2s_complement(uint8_t c)
 	}
 	ret = b;
 	ret = (negate == 1) ? -ret : ret;
-	// printf("\t%x\n",b);
 	return ret;
 }
 
@@ -326,6 +339,9 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 	static uint8_t key; // macro key handling
 		
 	switch (reportID) {
+		// this needs to be refactored, so I don't interpret the commands directly in the switch
+		// but delegate similar to the absolute reports
+		//
 		case kRelativePointer:
 			ResetButtons;
 			deltaX=aiptek_convert_from_2s_complement(inReport[2]);
@@ -403,7 +419,7 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 					// use soft keys to do some changes to the tablet's state
 					switch (inReport[3]/2) {
 						case 21:
-							InitTabletBounds(0, 0, 3000, 2250);
+							InitTabletBounds(500, 500, 3500, 2750);
 							puts("shrinking tablet bounds");
 							break;
 						case 22:
@@ -450,6 +466,8 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 	}
 	
 }
+
+// <Start of TabletMagic Code>
 
 //
 // ShortSleep
@@ -1089,7 +1107,11 @@ void ResetStylus() {
 	PostChangeEvents();
 }
 
+// <End of TabletMagic Code>
 
+// the main as all other code is naive because it assumes everything
+// runs well - allthough every call returns a status code I don't handle
+// them at the moment
 int main (int argc, const char * argv[]) {
 	
 	IOHIDManagerRef	ioHidManager;
@@ -1137,6 +1159,10 @@ int main (int argc, const char * argv[]) {
 		
 		ioReturn=OpenHIDService();
 		InitStylus();
+		
+		// hard coded for Aiptek 12000U at the moment - has to be removed by the resolution of
+		// the connected device
+		
 		InitTabletBounds(0, 0, 6000, 4500);
 		UpdateDisplaysBounds();
 		SetScreenMapping(0,0,-1,-1);
@@ -1146,10 +1172,6 @@ int main (int argc, const char * argv[]) {
 		ioReturn=CloseHIDService();
 		
 		ioReturn=IOHIDManagerClose(ioHidManager , kIOHIDOptionsTypeNone);
-		
-//		CFRelease(matchingElements);
-//		CFRelease(matchingDeviceSet);
-		
 		
 		CFRelease(matchingDictionary);
 		CFRelease(ioHidManager);
