@@ -424,11 +424,13 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 							// HIDPostAuxKey(NX_SUBTYPE_STICKYKEYS_ON);
 							// HIDPostAuxKey(NX_SUBTYPE_STICKYKEYS_SHIFT);
 							// HIDPostVirtualModifiers(kVK_F10,FALSE,FALSE);
-							HIDPostVirtualModifier(0xffffffff, FALSE, FALSE);
-							HIDPostVirtualKey(kVK_F6|NX_SHIFTMASK, FALSE, FALSE);
+							HIDPostVirtualModifier(NX_ALTERNATEMASK|NX_SHIFTMASK);
+							HIDPostVirtualKey(kVK_F6, FALSE, FALSE);
 							HIDPostVirtualKey(kVK_F6, TRUE, FALSE);
-							HIDPostVirtualModifier(0xffffffff, TRUE, FALSE);
+							HIDPostVirtualModifier(0);
 							break;
+							
+							
 							
 						case 18:
 							HIDPostVirtualKey(kVK_F10, FALSE, FALSE);
@@ -499,26 +501,28 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 //
 
 
-void HIDPostVirtualModifier(
-					   const UInt8 inVirtualKeyCode,
-					   const Boolean inPostUp,
-					   const Boolean inRepeat)
+void HIDPostVirtualModifier(UInt32 gModifiers)
 {
 	NXEventData eventData;
 	IOGPoint  loc = { 0, 0 };
 	
-	NXEvent event;
+	// NXEvent event;
 	
-	bzero(&event, sizeof(NXEvent));
+	// bzero(&event, sizeof(NXEvent));
 	bzero(&eventData, sizeof(NXEventData));
 	
 
-	
+	/*
 	eventData.key.repeat = inRepeat;
 	eventData.key.keyCode = inVirtualKeyCode;
 	eventData.key.origCharSet = eventData.key.charSet = NX_ASCIISET;
 	eventData.key.origCharCode = eventData.key.charCode = 0;
-	IOHIDPostEvent(gEventDriver, NX_FLAGSCHANGED, loc, &eventData, kNXEventDataVersion, kIOHIDPostHIDManagerEvent , FALSE );
+	*/
+	// eventData.key.reserved1= eventData.key.reserved2= eventData.key.reserved3=eventData.key.reserved4=NX_SHIFTMASK;
+	
+	// gModifiers=NX_COMMANDMASK;
+	
+	IOHIDPostEvent(gEventDriver, NX_FLAGSCHANGED, loc, &eventData, kNXEventDataVersion, gModifiers , TRUE );
 
 	// | (inPostUp) ? NX_KEYUP : NX_KEYDOWN
 	// event.type=
@@ -544,7 +548,7 @@ void HIDPostVirtualKey(
 	eventData.key.keyCode = inVirtualKeyCode;
 	eventData.key.origCharSet = eventData.key.charSet = NX_ASCIISET;
 	eventData.key.origCharCode = eventData.key.charCode = 0x0;
-	IOHIDPostEvent(gEventDriver, inPostUp ? NX_KEYUP : NX_KEYDOWN, loc, &eventData, kNXEventDataVersion, kIOHIDPostHIDManagerEvent , FALSE );
+	IOHIDPostEvent(gEventDriver, (inPostUp ? NX_KEYUP : NX_KEYDOWN), loc, &eventData, kNXEventDataVersion,  kIOHIDPostHIDManagerEvent , FALSE );
 	
 	// event.type=
 }
