@@ -69,6 +69,7 @@
 #include "stylus.h"		// structures and constants needed for TabletMagic's functions to work
 #include "aiptek.h"		// background information needed to understand tablet's reports and
 						// functions - taken from Linux' kernel driver
+// #include "vkeys.h"
 
 // Aiptek
 #define VendorID  0x08ca
@@ -156,6 +157,7 @@ char * buttonNames[] = {"dummy","button 1","button 2","button 3","button 4","but
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
 								   uint32_t reportID, uint8_t *inReport, CFIndex length);
 void InitTabletBounds(SInt32 x1, SInt32 y1, SInt32 x2, SInt32 y2);
+void HIDPostVirtualKey(const UInt8 inVirtualKeyCode, const Boolean inPostUp, const Boolean inRepeat);
 
 // unschedule events fired by the device from run loop
 void theDeviceRemovalCallback (void *context, IOReturn result, void *sender, IOHIDDeviceRef device)
@@ -418,6 +420,32 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 					key=99;	// reset state
 					// use soft keys to do some changes to the tablet's state
 					switch (inReport[3]/2) {
+						case 17:
+							// HIDPostAuxKey(NX_SUBTYPE_STICKYKEYS_ON);
+							// HIDPostAuxKey(NX_SUBTYPE_STICKYKEYS_SHIFT);
+							// HIDPostVirtualModifiers(kVK_F10,FALSE,FALSE);
+							HIDPostVirtualModifier(0xffffffff, FALSE, FALSE);
+							HIDPostVirtualKey(kVK_F6|NX_SHIFTMASK, FALSE, FALSE);
+							HIDPostVirtualKey(kVK_F6, TRUE, FALSE);
+							HIDPostVirtualModifier(0xffffffff, TRUE, FALSE);
+							break;
+							
+						case 18:
+							HIDPostVirtualKey(kVK_F10, FALSE, FALSE);
+							HIDPostVirtualKey(kVK_F10, TRUE, FALSE);
+							break;
+							
+						
+						case 19:
+							HIDPostVirtualKey(kVK_F8, FALSE, FALSE);
+							HIDPostVirtualKey(kVK_F8, TRUE, FALSE);
+							break;
+							
+						case 20:
+							HIDPostVirtualKey(0, FALSE, FALSE);
+							HIDPostVirtualKey(0, TRUE, FALSE);
+							break;
+							
 						case 21:
 							InitTabletBounds(500, 500, 3500, 2750);
 							puts("shrinking tablet bounds");
@@ -427,7 +455,8 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 							puts("resetting tablet bounds");
 							break;
 
-						case 23:
+						// acase 23:	
+						case 30:
 							issueCommand(currentDeviceRef, switchToMouse);
 							mouse_mode=TRUE;
 							stylus.point.x=3000;
@@ -466,6 +495,61 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 	}
 	
 }
+
+//
+
+
+void HIDPostVirtualModifier(
+					   const UInt8 inVirtualKeyCode,
+					   const Boolean inPostUp,
+					   const Boolean inRepeat)
+{
+	NXEventData eventData;
+	IOGPoint  loc = { 0, 0 };
+	
+	NXEvent event;
+	
+	bzero(&event, sizeof(NXEvent));
+	bzero(&eventData, sizeof(NXEventData));
+	
+
+	
+	eventData.key.repeat = inRepeat;
+	eventData.key.keyCode = inVirtualKeyCode;
+	eventData.key.origCharSet = eventData.key.charSet = NX_ASCIISET;
+	eventData.key.origCharCode = eventData.key.charCode = 0;
+	IOHIDPostEvent(gEventDriver, NX_FLAGSCHANGED, loc, &eventData, kNXEventDataVersion, kIOHIDPostHIDManagerEvent , FALSE );
+
+	// | (inPostUp) ? NX_KEYUP : NX_KEYDOWN
+	// event.type=
+}
+	
+void HIDPostVirtualKey(
+							  const UInt8 inVirtualKeyCode,
+							  const Boolean inPostUp,
+							  const Boolean inRepeat)
+{
+	NXEventData eventData;
+	IOGPoint  loc = { 0, 0 };
+	
+	NXEvent event;
+	
+	bzero(&event, sizeof(NXEvent));
+	bzero(&eventData, sizeof(NXEventData));
+	
+	// event.flags=NX_COMMANDMASK;
+	// NX_FLAGSCHANGED
+	
+	eventData.key.repeat = inRepeat;
+	eventData.key.keyCode = inVirtualKeyCode;
+	eventData.key.origCharSet = eventData.key.charSet = NX_ASCIISET;
+	eventData.key.origCharCode = eventData.key.charCode = 0x0;
+	IOHIDPostEvent(gEventDriver, inPostUp ? NX_KEYUP : NX_KEYDOWN, loc, &eventData, kNXEventDataVersion, kIOHIDPostHIDManagerEvent , FALSE );
+	
+	// event.type=
+}
+
+
 
 // <Start of TabletMagic Code>
 
