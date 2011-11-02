@@ -157,6 +157,8 @@ char * buttonNames[] = {"dummy","button 1","button 2","button 3","button 4","but
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
 								   uint32_t reportID, uint8_t *inReport, CFIndex length);
 void InitTabletBounds(SInt32 x1, SInt32 y1, SInt32 x2, SInt32 y2);
+
+void HIDPostVirtualModifier(UInt32 gModifiers);
 void HIDPostVirtualKey(const UInt8 inVirtualKeyCode, const Boolean inPostUp, const Boolean inRepeat);
 
 // unschedule events fired by the device from run loop
@@ -506,26 +508,9 @@ void HIDPostVirtualModifier(UInt32 gModifiers)
 	NXEventData eventData;
 	IOGPoint  loc = { 0, 0 };
 	
-	// NXEvent event;
-	
-	// bzero(&event, sizeof(NXEvent));
 	bzero(&eventData, sizeof(NXEventData));
-	
-
-	/*
-	eventData.key.repeat = inRepeat;
-	eventData.key.keyCode = inVirtualKeyCode;
-	eventData.key.origCharSet = eventData.key.charSet = NX_ASCIISET;
-	eventData.key.origCharCode = eventData.key.charCode = 0;
-	*/
-	// eventData.key.reserved1= eventData.key.reserved2= eventData.key.reserved3=eventData.key.reserved4=NX_SHIFTMASK;
-	
-	// gModifiers=NX_COMMANDMASK;
-	
+		
 	IOHIDPostEvent(gEventDriver, NX_FLAGSCHANGED, loc, &eventData, kNXEventDataVersion, gModifiers , TRUE );
-
-	// | (inPostUp) ? NX_KEYUP : NX_KEYDOWN
-	// event.type=
 }
 	
 void HIDPostVirtualKey(
@@ -1076,6 +1061,9 @@ kern_return_t CloseHIDService() {
 	return r;
 }
 
+//
+// OpenHidService
+//
 kern_return_t OpenHIDService() {
 	kern_return_t   kr;
 	mach_port_t		ev, service;
@@ -1200,7 +1188,13 @@ void ResetStylus() {
 // the main as all other code is naive because it assumes everything
 // runs well - allthough every call returns a status code I don't handle
 // them at the moment
+//
+// need to add options to set tablet make and attributes
+// will setup profiles that can be loaded for the function keys
+//
 int main (int argc, const char * argv[]) {
+	
+	fprintf(stderr, "Aiptek Tablet Driver for OSX\nDesigned and tested for HyperPen 12000U\n(c) Udo Killermann 2011\n\n");
 	
 	IOHIDManagerRef	ioHidManager;
 	IOReturn ioReturn;
@@ -1235,6 +1229,9 @@ int main (int argc, const char * argv[]) {
 	CFRelease(vendorID);
 
 	IOHIDManagerSetDeviceMatching(ioHidManager, matchingDictionary);
+	// to support other Aiptek Tablets and Medion clones I'll have to use
+	// IOHIDManagerSetDeviceMatchingMultiple and deliver distinct dictionaries
+	// for every device to match
 	
 	ioReturn=IOHIDManagerOpen(ioHidManager,kIOHIDOptionsTypeSeizeDevice);
 	
