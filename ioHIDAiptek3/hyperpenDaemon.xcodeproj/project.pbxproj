@@ -35,6 +35,7 @@
 		85996A521451BFA800E6C31C /* aiptek.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = aiptek.h; sourceTree = "<group>"; };
 		85A139431440B11D00273EFC /* AppKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppKit.framework; path = System/Library/Frameworks/AppKit.framework; sourceTree = SDKROOT; };
 		85A51C8714508B9200D6D18B /* stylus.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = stylus.h; sourceTree = "<group>"; };
+		85C2B905145DA674008BE91A /* vkeys.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = vkeys.h; sourceTree = "<group>"; };
 		85F3112B138F6A3100070734 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		8DD76F7E0486A8DE00D96B5E /* hyperpenDaemon */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = hyperpenDaemon; sourceTree = BUILT_PRODUCTS_DIR; };
 		C6859E970290921104C91782 /* ioHIDFunctions.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = ioHIDFunctions.1; sourceTree = "<group>"; };
@@ -69,6 +70,7 @@
 		08FB7795FE84155DC02AAC07 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				85C2B905145DA674008BE91A /* vkeys.h */,
 				08FB7796FE84155DC02AAC07 /* main.c */,
 				85A51C8714508B9200D6D18B /* stylus.h */,
 				85996A521451BFA800E6C31C /* aiptek.h */,
