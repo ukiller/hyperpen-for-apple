@@ -1210,6 +1210,7 @@ int main (int argc, const char * argv[]) {
 
 // Aiptek HyperPen 12000U
 // taken from the top defines
+	
 	product=ProductID;
 	vendor=VendorID;
 	
