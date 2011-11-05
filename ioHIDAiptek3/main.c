@@ -1185,6 +1185,22 @@ void ResetStylus() {
 
 // <End of TabletMagic Code>
 
+
+// 
+void print_help(int exval) {
+	printf("%s [-v ID] [-p ID] [-w WIDTH] [-h HEIGHT] [-x X-OFFSET] [-y Y-OFFSET]\n\n", "hyperpenDaemon");
+	
+	printf("  -v ID           set vendor  (e.g. 0x08ca)\n");
+	printf("  -p ID           set product (e.g. 0x0010)\n");
+
+	printf("  -w WIDTH        set tablet width  (e.g. 6000)\n");
+	printf("  -h HEIGHT       set tablet height (e.g. 4500)\n");
+
+	printf("  -x X-OFFSET     set tablet x offset (e.g. 0)\n");
+	printf("  -y Y-OFFSET     set tablet y offset (e.g. 0)\n\n");
+	
+	exit(exval);
+}
 // the main as all other code is naive because it assumes everything
 // runs well - allthough every call returns a status code I don't handle
 // them at the moment
@@ -1192,7 +1208,7 @@ void ResetStylus() {
 // need to add options to set tablet make and attributes
 // will setup profiles that can be loaded for the function keys
 //
-int main (int argc, const char * argv[]) {
+int main (int argc, char * argv[]) {
 	
 	fprintf(stderr, "Aiptek Tablet Driver for OSX\nDesigned and tested for HyperPen 12000U\n(c) Udo Killermann 2011\n\n");
 	
@@ -1207,12 +1223,60 @@ int main (int argc, const char * argv[]) {
 	
 	UInt32 vendor;
 	UInt32 product;
+	int opt;
+	int width=6000;
+	int height=4500;
+	int offsetX=0;
+	int offsetY=0;
 
 // Aiptek HyperPen 12000U
 // taken from the top defines
 	
 	product=ProductID;
 	vendor=VendorID;
+	
+
+	while((opt = getopt(argc, argv, "v:p:w:h:x:y:o")) != -1) {
+		switch(opt) {
+			case 'o':
+				print_help(0);
+				exit(0);
+				break;
+			case 'v':
+				vendor=strtol(optarg,(char **)NULL, 16);
+				break;
+			case 'p':
+				product=strtol(optarg,(char **)NULL, 16);
+				break;
+			case 'w':
+				width=atoi(optarg);
+				break;
+			case 'h':
+				height=atoi(optarg);
+				break;
+			case 'x':
+				offsetX=atoi(optarg);
+				break;
+			case 'y':
+				offsetY=atoi(optarg);
+				break;
+			case ':':
+				fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
+				print_help(1);
+				break;
+			case '?':
+				fprintf(stderr, "Error - No such option: `%c'\n\n", optopt);
+				print_help(1);
+		}
+	}
+	
+	printf("vendor: %x\n",vendor);
+	printf("product: %x\n",product);
+	printf("width: %d\n", width);
+	printf("height: %d\n", height);
+	printf("Offset X: %d\n",offsetX);
+	printf("Offset Y: %d\n",offsetY);
+	
 	
 	ioHidManager=IOHIDManagerCreate(kIOHIDOptionsTypeNone,0);
 	
@@ -1249,7 +1313,7 @@ int main (int argc, const char * argv[]) {
 		// hard coded for Aiptek 12000U at the moment - has to be removed by the resolution of
 		// the connected device
 		
-		InitTabletBounds(0, 0, 6000, 4500);
+		InitTabletBounds(offsetX, offsetY, width, height);
 		UpdateDisplaysBounds();
 		SetScreenMapping(0,0,-1,-1);
 		
