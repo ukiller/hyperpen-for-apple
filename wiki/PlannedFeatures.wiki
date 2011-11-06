@@ -1,14 +1,19 @@
-Planned features for the coming releases (10/22/2011)
+==Planned features for the coming releases==
 
-= Introduction =
+So now we have left (11/6/2011):
+ * gui to query and set tablet status and other parameters (as seen in tablet magic) 
+    * switch between mouse and tablet mode
+    * defining macro keys
+ * synthesize tablet status changes via macro keys
+    * x,y tilt
 
-The following features are on my list for the coming release:
-  * command line arguments
+The following features are on my list for the coming release (10/22/2011):
+  * command line arguments (done)
     * vendor and product ids to support other tablet models as well
     * active tablet bounds and extension
-  * gui to query and set tablet status and other parameters (as seen in tablet magic)
+  * gui to query and set tablet status and other parameters (as seen in tablet magic) 
     * switch between mouse and tablet mode
     * defining macro keys
   * synthesize tablet status changes via macro keys
     * x,y tilt
-  * simulate keypresses
+  * simulate keypresses (done)
