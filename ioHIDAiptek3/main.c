@@ -161,6 +161,8 @@ void InitTabletBounds(SInt32 x1, SInt32 y1, SInt32 x2, SInt32 y2);
 void HIDPostVirtualModifier(UInt32 gModifiers);
 void HIDPostVirtualKey(const UInt8 inVirtualKeyCode, const Boolean inPostUp, const Boolean inRepeat);
 
+void pressVirtualKeyWithModifiers(UInt8 inVirtualKeyCode, UInt32 gModifiers);
+
 // unschedule events fired by the device from run loop
 void theDeviceRemovalCallback (void *context, IOReturn result, void *sender, IOHIDDeviceRef device)
 {
@@ -306,6 +308,87 @@ void handleAbsoluteReport(uint8_t * inReport)
 	
 }
 
+void handleSoftKeys(int softKey)
+// use soft keys to do some changes to the tablet's state
+{
+	switch (softKey) {
+		case 1:
+			pressVirtualKeyWithModifiers(kVK_ANSI_N, NX_COMMANDMASK);
+			break;
+		case 2:
+			pressVirtualKeyWithModifiers(kVK_ANSI_O, NX_COMMANDMASK);
+			break;
+		case 3:
+			pressVirtualKeyWithModifiers(kVK_ANSI_W, NX_COMMANDMASK);
+			break;
+		case 4:
+			pressVirtualKeyWithModifiers(kVK_ANSI_S, NX_COMMANDMASK);
+			break;
+		case 5:
+			pressVirtualKeyWithModifiers(kVK_ANSI_Q, NX_COMMANDMASK);
+			break;
+			
+		case 6:
+			pressVirtualKeyWithModifiers(kVK_ANSI_X, NX_COMMANDMASK);
+			break;
+		case 7:
+			pressVirtualKeyWithModifiers(kVK_ANSI_C, NX_COMMANDMASK);
+			break;
+		case 8:
+			pressVirtualKeyWithModifiers(kVK_ANSI_V, NX_COMMANDMASK);
+			break;
+		case 9:
+			pressVirtualKeyWithModifiers(kVK_ANSI_Y, NX_COMMANDMASK);
+			break;
+			
+		case 17:
+			pressVirtualKeyWithModifiers(kVK_F8, 0);
+			break;
+			
+			
+			
+		case 18:
+			pressVirtualKeyWithModifiers(kVK_F10, 0); 
+			break;
+			
+			
+		case 19:
+			pressVirtualKeyWithModifiers(kVK_F9, 0); 
+			break;
+			
+		case 20:
+			pressVirtualKeyWithModifiers(kVK_F11, 0);
+			break;
+			
+		case 21:
+			InitTabletBounds(500, 500, 3500, 2750);
+			puts("shrinking tablet bounds");
+			break;
+		case 22:
+			InitTabletBounds(0, 0, 6000, 4500);
+			puts("resetting tablet bounds");
+			break;
+			
+			// acase 23:	
+		case 30:
+			issueCommand(currentDeviceRef, switchToMouse);
+			mouse_mode=TRUE;
+			stylus.point.x=3000;
+			stylus.point.y=2250;
+			stylus.off_tablet = FALSE;
+			puts("switching to mouse (relative) mode");
+			break;
+		case 24:
+			issueCommand(currentDeviceRef, switchToTablet);
+			stylus.off_tablet = TRUE;
+			mouse_mode=FALSE;
+			break;
+		default:
+			break;
+	}
+}
+
+
 
 // 
 // Relative reports (mouse mode) deliver values in 2's complement format to
@@ -413,6 +496,7 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 			break;
 			
 		case kMacroStylus:
+			
 			if (inReport[1] & TIPmask) {
 				key=inReport[3]/2;
 			}
@@ -420,64 +504,11 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 				if (inReport[3]/2==key) {
 					printf("%s\n",buttonNames[key]);
 					key=99;	// reset state
-					// use soft keys to do some changes to the tablet's state
-					switch (inReport[3]/2) {
-						case 17:
-							// HIDPostAuxKey(NX_SUBTYPE_STICKYKEYS_ON);
-							// HIDPostAuxKey(NX_SUBTYPE_STICKYKEYS_SHIFT);
-							// HIDPostVirtualModifiers(kVK_F10,FALSE,FALSE);
-							HIDPostVirtualModifier(NX_ALTERNATEMASK|NX_SHIFTMASK);
-							HIDPostVirtualKey(kVK_F6, FALSE, FALSE);
-							HIDPostVirtualKey(kVK_F6, TRUE, FALSE);
-							HIDPostVirtualModifier(0);
-							break;
-							
-							
-							
-						case 18:
-							HIDPostVirtualKey(kVK_F10, FALSE, FALSE);
-							HIDPostVirtualKey(kVK_F10, TRUE, FALSE);
-							break;
-							
-						
-						case 19:
-							HIDPostVirtualKey(kVK_F8, FALSE, FALSE);
-							HIDPostVirtualKey(kVK_F8, TRUE, FALSE);
-							break;
-							
-						case 20:
-							HIDPostVirtualKey(0, FALSE, FALSE);
-							HIDPostVirtualKey(0, TRUE, FALSE);
-							break;
-							
-						case 21:
-							InitTabletBounds(500, 500, 3500, 2750);
-							puts("shrinking tablet bounds");
-							break;
-						case 22:
-							InitTabletBounds(0, 0, 6000, 4500);
-							puts("resetting tablet bounds");
-							break;
-
-						// acase 23:	
-						case 30:
-							issueCommand(currentDeviceRef, switchToMouse);
-							mouse_mode=TRUE;
-							stylus.point.x=3000;
-							stylus.point.y=2250;
-							stylus.off_tablet = FALSE;
-							puts("switching to mouse (relative) mode");
-							break;
-						case 24:
-							issueCommand(currentDeviceRef, switchToTablet);
-							stylus.off_tablet = TRUE;
-							mouse_mode=FALSE;
-							break;
-						default:
-							break;
-					}
+					handleSoftKeys(inReport[3]/2);
 				}
 			}
+					
+			
 
 			break;
 
@@ -538,7 +569,14 @@ void HIDPostVirtualKey(
 	// event.type=
 }
 
-
+void pressVirtualKeyWithModifiers(UInt8 inVirtualKeyCode, UInt32 gModifiers)
+{
+	HIDPostVirtualModifier(gModifiers);
+	HIDPostVirtualKey(inVirtualKeyCode, FALSE, FALSE);
+	HIDPostVirtualKey(inVirtualKeyCode, TRUE, FALSE);
+	HIDPostVirtualModifier(0);
+	
+}
 
 // <Start of TabletMagic Code>
 
