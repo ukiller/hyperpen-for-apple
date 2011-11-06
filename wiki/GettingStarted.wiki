@@ -1,7 +1,7 @@
 #labels Featured
 == Starting ==
 
-Download hyperpenDaemon.zip from the Downloads section to your computer. Unzip it by double clicking the file in the Finder. Now you should have a file named hyperpenDaemon on your disc, which should present itself as a executable unix file. Start it by double clicking and it should open in a terminal window. When starting it shows a copyright notice and some configuration settings:
+Download hyperpenDaemon.zip from the Downloads section to your computer. Unzip it by double clicking the file in the Finder. Now you should have a file named hyperpenDaemon on your disc, which should present itself as a executable unix file. Start it by double clicking and it should open in a terminal window. When starting it shows a copyright notice and some configuration information:
 {{{
 Aiptek Tablet Driver for OSX
 Designed and tested for HyperPen 12000U
@@ -19,4 +19,10 @@ Tablet connected!
 
 The last line is only shown if you already have your tablet connected to your computer. Otherwise it will show as soon as you plug your tablet into the USB port and the green light on the lower right starts to blink. 
 
-That's it - just switch to the drawing application of your choice and start your artwork. If you select the right tool (i.e. a pressure sensitive one) you'll notice that the stylus now works in a different way. It depends on the pressure you apply 
+That's it - just switch to the drawing application of your choice and start your artwork. If you select the right tool (i.e. a pressure sensitive one) you'll notice that the stylus now works in a different way. The line width will depend on the pressure you apply to the stlylus. The position of the mouse pointer relates directly to the position of the stylus on the tablet.
+
+My driver enables the soft buttons on top of the tablet and executes the commands printed on them. So you can cut, copy, paste and so forth as you'd expect from the imprint. You can even start Excel, Word, Mail and Safari by clicking on the soft buttons. Excel and Word will only start if you have installed them on your computer.
+
+== Options ==
+
+ 
