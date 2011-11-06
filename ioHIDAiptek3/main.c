@@ -340,6 +340,34 @@ void handleSoftKeys(int softKey)
 		case 9:
 			pressVirtualKeyWithModifiers(kVK_ANSI_Y, NX_COMMANDMASK);
 			break;
+		
+		case 10:
+			system("osascript -e 'tell application \"System Preferences\" to activate' 2> /dev/null");
+			break;
+			
+		case 11:
+			system("osascript -e 'tell application \"Finder\" to activate' 2> /dev/null");
+			break;
+
+			
+		case 12:
+			system("osascript -e 'tell application \"Safari\" to activate' 2> /dev/null");
+			break;
+			
+			
+		case 13:
+			system("osascript -e 'tell application \"Mail\" to activate' 2> /dev/null");
+			break;
+			
+			
+		case 14:
+			system("osascript -e 'tell application \"Microsoft Word\" to activate' 2> /dev/null");
+			break;
+			
+		case 15:
+			system("osascript -e 'tell application \"Microsoft Excel\" to activate' 2> /dev/null");
+			break;
+			
 			
 		case 17:
 			pressVirtualKeyWithModifiers(kVK_F8, 0);
