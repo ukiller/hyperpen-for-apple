@@ -9,8 +9,8 @@ Designed and tested for HyperPen 12000U
 
 vendor: 8ca
 product: 10
-width: 1500
-height: 200
+width: 6000
+height: 4500
 Offset X: 0
 Offset Y: 0
 Screen Boundary: 0.00, 0.00 - 1280.00, 800.00
@@ -25,4 +25,15 @@ My driver enables the soft buttons on top of the tablet and executes the command
 
 == Options ==
 
- 
+If you use the Terminal application you can supply additional options to the daemon when it starts up. On the one hand you can try to use the driver for other tablets if you have Vendor id and Product id at hand. On the other hand you can restrict the active drawing area of your tablet if you don't want to move the pen around the 12 inches you purchased with the 12000U.
+
+To restrict the active area to a quarter of the tablet, you can use:
+{{{
+./hyperpenDaemon -w 3000 -h 2250
+}}}
+
+To change the vendor and product you can use:
+{{{
+./hyperpenDaemon -v 0x47 -p 0x20
+}}}
+Please note that you use hexadecimal notation to change the personality of the tablet.
