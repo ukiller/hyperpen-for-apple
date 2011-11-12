@@ -36,4 +36,4 @@ To change the vendor and product you can use:
 {{{
 ./hyperpenDaemon -v 0x47 -p 0x20
 }}}
-Please note that you use hexadecimal notation to change the personality of the tablet.
+Please note that you use hexadecimal notation to change the personality of the tablet. Have a look at WhichProduct how to find the correct values for these keys.
