@@ -1,4 +1,4 @@
-== How to get vendor and product id for you tablet ==
+== How to get vendor and product id for your tablet ==
 
 If you aren't into development but need to know which values to fill into the vendor and product information needed by the driver: have a look into the apple menu. Follow "About this Mac" and choose "More information..." in the dialog showing up.
 
