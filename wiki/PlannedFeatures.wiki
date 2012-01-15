@@ -1,9 +1,17 @@
+#labels features
 ==Planned features for the coming releases==
+
+(15/01/2012):
+* commandline option to configure functions keys
+* commandline option to configure pressure threshold
+* easy way to select the usb tablet in question (needed for the naive user)
+ 
 
 So now we have left (11/6/2011):
  * gui to query and set tablet status and other parameters (as seen in tablet magic) 
     * switch between mouse and tablet mode
     * defining macro keys
+
  * synthesize tablet status changes via macro keys
     * x,y tilt
 
