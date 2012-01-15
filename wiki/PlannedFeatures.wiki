@@ -1,10 +1,10 @@
 #labels features
 ==Planned features for the coming releases==
 
-(15/01/2012):
-* commandline option to configure functions keys
-* commandline option to configure pressure threshold
-* easy way to select the usb tablet in question (needed for the naive user)
+next steps (01/15/2012):
+ * commandline option to configure functions keys
+ * commandline option to configure pressure threshold
+ * easy way to select the usb tablet in question (needed for the naive user)
  
 
 So now we have left (11/6/2011):
