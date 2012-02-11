@@ -7,12 +7,13 @@ Aiptek Tablet Driver for OSX
 Designed and tested for HyperPen 12000U
 (c) Udo Killermann 2011
 
-vendor: 8ca
-product: 10
-width: 6000
-height: 4500
+vendor: 172f
+product: 37
+width: 12288
+height: 6912
 Offset X: 0
 Offset Y: 0
+Compensation: 128
 Screen Boundary: 0.00, 0.00 - 1280.00, 800.00
 Tablet connected!
 }}}
@@ -37,3 +38,11 @@ To change the vendor and product you can use:
 ./hyperpenDaemon -v 0x47 -p 0x20
 }}}
 Please note that you use hexadecimal notation to change the personality of the tablet. Have a look at WhichProduct how to find the correct values for these keys.
+
+If you need to compensate a mechanical weakness of the pen, you can use:
+
+{{{
+./hyperpenDaemon -c 128
+}}}
+
+Normally the pen measures pressure levels between 0 and 1023. Some pens don't reset to 0 but stay with a larger value instead. The example shows a way to compensate for a pen not going to a pressure smaller than 127. 
