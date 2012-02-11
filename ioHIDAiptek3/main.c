@@ -152,6 +152,7 @@ char * buttonNames[] = {"dummy","button 1","button 2","button 3","button 4","but
 
 
 
+int compensation=0;
 
 // forward declare
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
@@ -276,11 +277,13 @@ void handleAbsoluteReport(uint8_t * inReport)
 	
 	// constrain tip pressure to 511 (9 Bit)	
 	
-	tipPressure=(tipPressure>511)?511:tipPressure;
+	tipPressure=(tipPressure>1023)?1023:tipPressure;
+	
+	tipPressure=(tipPressure<compensation)?0:tipPressure;
 	
 	// tablet events are scaled to 0xFFFF (16 bit), so
 	// a little shift to the right is needed
-	stylus.pressure=tipPressure<<7; 
+	stylus.pressure=tipPressure<<6; 
 	
 	// reconstruct the button state
 	// button state is or'ed together using the corresponding bit masks
@@ -853,7 +856,9 @@ void PostChangeEvents() {
 		if ((stylus.proximity.enterProximity = !stylus.off_tablet))
 			stylus.proximity.pointerType = (stylus.eraser_flag && (button_mapping[kStylusEraser] == kSystemEraser)) ? EEraser : EPen;
 		PostNXEvent(buttonEvent, NX_SUBTYPE_TABLET_PROXIMITY,0);
+#ifdef LOG 
 		fprintf(stderr, "Stylus has %s proximity\n", stylus.off_tablet ? "exited" : "entered");
+#endif
 	}
 	
 	// Is a Double-Click warranted?
@@ -1254,16 +1259,19 @@ void ResetStylus() {
 
 // 
 void print_help(int exval) {
-	printf("%s [-v ID] [-p ID] [-w WIDTH] [-h HEIGHT] [-x X-OFFSET] [-y Y-OFFSET]\n\n", "hyperpenDaemon");
+	printf("%s [-v ID] [-p ID] [-w WIDTH] [-h HEIGHT] [-x X-OFFSET] [-y Y-OFFSET] [-c COMPENSATION]\n\n", "hyperpenDaemon");
 	
-	printf("  -v ID           set vendor  (e.g. 0x08ca)\n");
-	printf("  -p ID           set product (e.g. 0x0010)\n");
+	printf("  -v ID				set vendor  (e.g. 0x08ca)\n");
+	printf("  -p ID				set product (e.g. 0x0010)\n");
 
-	printf("  -w WIDTH        set tablet width  (e.g. 6000)\n");
-	printf("  -h HEIGHT       set tablet height (e.g. 4500)\n");
+	printf("  -w WIDTH			set tablet width  (e.g. 6000)\n");
+	printf("  -h HEIGHT			set tablet height (e.g. 4500)\n");
 
-	printf("  -x X-OFFSET     set tablet x offset (e.g. 0)\n");
-	printf("  -y Y-OFFSET     set tablet y offset (e.g. 0)\n\n");
+	printf("  -x X-OFFSET		set tablet x offset (e.g. 0)\n");
+	printf("  -y Y-OFFSET		set tablet y offset (e.g. 0)\n");
+	
+	
+	printf("  -c COMPENSATION	compensate mechanical restriction (0-128)\n\n");
 	
 	exit(exval);
 }
@@ -1302,7 +1310,7 @@ int main (int argc, char * argv[]) {
 	vendor=VendorID;
 	
 
-	while((opt = getopt(argc, argv, "v:p:w:h:x:y:o")) != -1) {
+	while((opt = getopt(argc, argv, "v:p:w:h:x:y:c:o")) != -1) {
 		switch(opt) {
 			case 'o':
 				print_help(0);
@@ -1326,6 +1334,10 @@ int main (int argc, char * argv[]) {
 			case 'y':
 				offsetY=atoi(optarg);
 				break;
+			case 'c':						// callibration value to compensate mechanical restrictions
+				compensation=atoi(optarg);
+				break;
+
 			case ':':
 				fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
 				print_help(1);
@@ -1342,6 +1354,7 @@ int main (int argc, char * argv[]) {
 	printf("height: %d\n", height);
 	printf("Offset X: %d\n",offsetX);
 	printf("Offset Y: %d\n",offsetY);
+	printf("Compensation: %d\n", compensation);
 	
 	
 	ioHidManager=IOHIDManagerCreate(kIOHIDOptionsTypeNone,0);
