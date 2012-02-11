@@ -279,7 +279,7 @@ void handleAbsoluteReport(uint8_t * inReport)
 	
 	tipPressure=(tipPressure>1023)?1023:tipPressure;
 	
-	tipPressure=(tipPressure<compensation)?0:tipPressure;
+	tipPressure=(tipPressure<compensation)?0:tipPressure-compensation;
 	
 	// tablet events are scaled to 0xFFFF (16 bit), so
 	// a little shift to the right is needed
@@ -1271,7 +1271,7 @@ void print_help(int exval) {
 	printf("  -y Y-OFFSET		set tablet y offset (e.g. 0)\n");
 	
 	
-	printf("  -c COMPENSATION	compensate mechanical restriction (0-128)\n\n");
+	printf("  -c COMPENSATION	compensate mechanical restriction (0-256)\n\n");
 	
 	exit(exval);
 }
