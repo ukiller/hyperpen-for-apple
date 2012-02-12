@@ -11,7 +11,7 @@ Most tablets still arrive in the width:height ratio 4:3. Modern MacBooks come wi
 
 Let's do a little calculation:
   * my 12000U has a resolution of 6000x4500 which gives it a perfect 4:3 ratio
-  * the screen of my MacBook shows as 1280x800 which reads as 16:10 (changing screen size isn't an opportunity
+  * the screen of my MacBook shows as 1280x800 which reads as 16:10 (changing screen size isn't an opportunity)
   * using 16:10 ratio the active height of the tablet should be restricted to 3750
   * this leads to a modified resolution of 6000x3750 needed for the tablet
 
