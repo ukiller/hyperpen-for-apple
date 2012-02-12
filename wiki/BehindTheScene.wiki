@@ -33,3 +33,13 @@ Going for Hypern Pen Mini which has a width of 12288 leads to a height of 7680:
 Somehow it's interesting to see how many people actually download the driver. There seems to be a real need for it. To date two users have responded to my wish to get some feedback. Both of them seemed quite happy with the driver.
 
 I would like others to respond as well. So I can learn which tablets the driver works with. Others would profit as well - cause the setting for their specific tablet would be known/documented.
+
+= Launching Daemon at System Startup =
+
+It would be convenient for the average user to launch the driver during system startup. At the moment I am still developing the driver, so it wouldn't be helpful in my setting. Although I describe how you could achieve it.
+
+You need to add information to two directories:
+  * /Library/Application Support/
+  * /Library/LaunchAgents/
+
+... to be continued soon
