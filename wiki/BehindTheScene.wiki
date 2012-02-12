@@ -16,7 +16,7 @@ Let's do a little calculation:
   * this leads to a modified resolution of 6000x3750 needed for the tablet
 
   * using 16:9 ratio the active height of the tablet should be restricted to 3375
-    * this leads to a modified resolution of 6000x3375 needed for the tablet
+  * this leads to a modified resolution of 6000x3375 needed for the tablet
 
 Changing the effective resolution is done with options -w and -h respectively. The resulting command for 16:10 ratio:
 {{{
