@@ -1,4 +1,4 @@
-#This page summarizes some things related to tablets and drivers.
+This page summarizes some things related to tablets and drivers.
 
 = Introduction =
 
@@ -15,7 +15,10 @@ Let's do a little calculation:
   * using 16:10 ratio the active height of the tablet should be restricted to 3750
   * this leads to a modified resolution of 6000x3750 needed for the tablet
 
-Changing the effective resolution is done with options -w and -h respectively. The resulting command looks like:
+  * using 16:9 ratio the active height of the tablet should be restricted to 3375
+    * this leads to a modified resolution of 6000x3375 needed for the tablet
+
+Changing the effective resolution is done with options -w and -h respectively. The resulting command for 16:10 ratio:
 {{{
 ./hyperpen -w 6000 -h 3750
 }}}
@@ -24,3 +27,5 @@ Going for Hypern Pen Mini which has a width of 12288 leads to a height of 7680:
 {{{
 ./hyperpen -w 12288 -h 7680 -v 0x172f -p 0x37
 }}}
+
+= to be continued =
