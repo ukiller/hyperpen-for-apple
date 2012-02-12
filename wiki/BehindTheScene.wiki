@@ -28,4 +28,8 @@ Going for Hypern Pen Mini which has a width of 12288 leads to a height of 7680:
 ./hyperpen -w 12288 -h 7680 -v 0x172f -p 0x37
 }}}
 
-= to be continued =
+= User Response =
+
+Somehow it's interesting to see how many people actually download the driver. There seems to be a real need for it. To date two users have responded to my wish to get some feedback. Both of them seemed quite happy with the driver.
+
+I would like others to respond as well. So I can learn which tablets the driver works with. Others would profit as well - cause the setting for their specific tablet would be known/documented.
