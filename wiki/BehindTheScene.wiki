@@ -39,7 +39,7 @@ I would like others to respond as well. So I can learn which tablets the driver 
 It would be convenient for the average user to launch the driver during system startup. At the moment I am still developing the driver, so it wouldn't be helpful in my setting. Although I describe how you could achieve it.
 
 You need to add information to two directories:
-  * /Library/Application Support/
-  * /Library/LaunchAgents/
+  * `/Library/Application Support/`
+  * `/Library/LaunchAgents/`
 
 ... to be continued soon
