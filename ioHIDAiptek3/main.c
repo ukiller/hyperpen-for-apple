@@ -276,19 +276,23 @@ void handleAbsoluteReport(uint8_t * inReport)
 	
 	
 	// constrain tip pressure to 511 (9 Bit)	
+	// hyperpen Mini spports 1023 pressure levels (10 Bit)
 	
-	tipPressure=(tipPressure>1023)?1023:tipPressure;
+	tipPressure=(tipPressure>511+compensation)?511+compensation:tipPressure;
 	
 	tipPressure=(tipPressure<compensation)?0:tipPressure-compensation;
 	
+	
 	// tablet events are scaled to 0xFFFF (16 bit), so
 	// a little shift to the right is needed
-	stylus.pressure=tipPressure<<6; 
+	stylus.pressure=(tipPressure<<7 | 0x3f); 
+	
+	// for the mini we have to shift only 6 positions
 	
 	// reconstruct the button state
 	// button state is or'ed together using the corresponding bit masks
 	
-	if (inReport[5] & TIPmask) {
+	if (inReport[5] & TIPmask && stylus.pressure>0) {
 		bm|=kBitStylusTip;
 	}
 	
