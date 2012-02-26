@@ -1,0 +1,24 @@
+# 
+
+= Introduction =
+
+a little utility to configure the driver
+
+
+= Details =
+
+Add your content here.  Format your content with:
+  * Text in *bold* or _italic_
+  * Headings, paragraphs, and lists
+  * Automatic links to other wiki pages
+
+http://hyperpen-for-apple.googlecode.com/svn/wiki/hyperpenConfig/1%20initial%20view.jpg
+
+http://hyperpen-for-apple.googlecode.com/svn/wiki/hyperpenConfig/2%20select%20tablet.jpg
+
+http://hyperpen-for-apple.googlecode.com/svn/wiki/hyperpenConfig/3%20tablet%20config.jpg
+
+http://hyperpen-for-apple.googlecode.com/svn/wiki/hyperpenConfig/4%20save%20config.jpg
+
+http://hyperpen-for-apple.googlecode.com/svn/wiki/hyperpenConfig/5%20launch%20daemon.jpg
+
