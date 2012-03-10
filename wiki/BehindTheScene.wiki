@@ -8,11 +8,11 @@ While working on the driver I stumbled over several issues I would like to share
 
 Some tablets have built-in keys you can really press or softkeys you can choose with the stylus. Based on the 12000U I have designed the driver to handle 24 softkeys. These softkeys are arranged on top of the drawing area.
 
-I used the imprinted labels (as seen on Windows) to guide the actions I've implemented. Some of these actions consist of a keypress (e.g. cmd-c for copy) others invoke an AppleScript script to activate chosen applications (e.g. Microsoft Word or Safari).
+I used the imprinted labels (as seen on Windows) to guide the actions I've implemented. Some of these actions consist of a keypress (e.g. cmd-c for copy) others invoke an Apple Script script to activate chosen applications (e.g. Microsoft Word or Safari).
 
 Several users have asked for a way to customize the actions and override the built-in actions. I've come up with a solution that relies on command scripts. Every key now has a corresponding command file named *`##.command`*. These files reside in the *`common/`* directory below the driver. ## stands for the number of the key (1-9 preceded by a 0). So *`common/12.command`* is the command invoked when the user picks no 12 with the stylus. You can carry out anything in the script based on your scripting experience (csh, sh, osascript) - whatever comes to your mind.
 
-Here is an example to start Microsoft Word from AppleScript:
+Here is an example to start Microsoft Word from Apple Script:
 {{{
 #!/usr/bin/osascript
 tell application "Microsoft Word" to activate
@@ -20,7 +20,9 @@ tell application "Microsoft Word" to activate
 
 The command file needs to be executable by the system. So you need to either *`chmod 755 12.command`* in the shell or use *`06.command`* as a boiler plate.
 
-For those of you who don't even have softkeys on their tablets I've added virtual tablet keys as an experimental feature to the current driver. These virtual tablet keys are available if you use your 4:3 (i.e 16:12) tablet in 16:9 or 16:10 mode. You gain an otherwise wasted tablet estate below the active area. I've divided this strip into 8 sections which behave like the softkeys described above. They use the same command files for the time being. 
+For those of you who don't even have softkeys on their tablets I've added virtual tablet keys as an experimental feature to the current driver. These virtual tablet keys are available if you use your 4:3 (i.e 16:12) tablet in 16:9 or 16:10 mode. 
+
+Using *`-t`* you activate the feature tablet keys. This way you gain an otherwise wasted tablet estate below the active area. I've divided this strip into 8 sections which behave like the softkeys described above. They use the same command files for the time being. In a further step I will use another naming convention for these keys. This way even on 12000U you will benefit from 8 additional keys (=32 if you count the 24 softkeys).
 
 
 == Aspect Ratio ==
