@@ -23,9 +23,19 @@ The command file needs to be executable by the system. So you need to either *`c
 ==Tablet Keys==
 For those of you who don't even have softkeys on their tablets I've added virtual tablet keys as an experimental feature to the current driver. 
 
-These virtual tablet keys are available if you use your 4:3 (i.e 16:12) tablet in 16:9 or 16:10 mode. 
+These virtual tablet keys are available if you use your 4:3 tablet in 16:9 or 16:10 mode. 
+
+*Original Tablet*
 
 http://hyperpen-for-apple.googlecode.com/svn/wiki/tabletKeys/originalTablet.jpg
+
+*Rescaled Tablet*
+
+http://hyperpen-for-apple.googlecode.com/svn/wiki/tabletKeys/rescaledTablet.jpg
+
+*Tablet Keys*
+
+http://hyperpen-for-apple.googlecode.com/svn/wiki/tabletKeys/Untitled.jpg
 
 Using *`-t`* you activate the feature tablet keys. This way you gain an otherwise wasted tablet estate below the active area. I've divided this strip into 8 sections which behave like the softkeys described above. They use the same command files for the time being. In a further step I will use another naming convention for these keys. This way even on 12000U you will benefit from 8 additional keys (=32 if you count the 24 softkeys).
 
