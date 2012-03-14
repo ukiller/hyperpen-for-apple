@@ -1,7 +1,7 @@
 #labels Featured
 = Introduction =
 
-Some of you have wished for a utility to configure the driver. The main feature you needed was a little dialog and circumvent the command line to set the options for your tablet. So I have put together `hyperpenConfig`. You can download the app [http://code.google.com/p/hyperpen-for-apple/downloads/detail?name=hyperpenConfig.zip&can=2&q= here]. 
+Some of you have wished for a utility to configure the driver. The main feature you needed was a little dialog and circumvent the command line to set the options for your tablet. So I have put together `hyperpenConfig`. You can download the app in the Downloads section.
 
 The following screent shots show you how to use it
 
