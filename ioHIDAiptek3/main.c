@@ -153,6 +153,8 @@ char * buttonNames[] = {"dummy","button 1","button 2","button 3","button 4","but
 
 
 int compensation=0;
+int noOfTabletKeys=8;
+bool tabletKeys=false;
 
 // forward declare
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
@@ -163,6 +165,7 @@ void HIDPostVirtualModifier(UInt32 gModifiers);
 void HIDPostVirtualKey(const UInt8 inVirtualKeyCode, const Boolean inPostUp, const Boolean inRepeat);
 
 void pressVirtualKeyWithModifiers(UInt8 inVirtualKeyCode, UInt32 gModifiers);
+bool handleCustomActions(int softKey);
 
 // unschedule events fired by the device from run loop
 void theDeviceRemovalCallback (void *context, IOReturn result, void *sender, IOHIDDeviceRef device)
@@ -237,12 +240,13 @@ void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSende
 // essantially this routine converts the raw information received by the Aiptek Tablet
 // to the logical tablet and stylus state represented by TabletMagic's code
 //
-void handleAbsoluteReport(uint8_t * inReport)
+int handleAbsoluteReport(uint8_t * inReport)
 {
 	int xCoord;
 	int yCoord;
 	int tipPressure;
 	UInt16	bm = 0; // button mask
+	static bool buttonPressed=false; 
 	
 	ResetButtons;  // forget the system buttons and reconstruct them in this routine
 	
@@ -251,6 +255,8 @@ void handleAbsoluteReport(uint8_t * inReport)
 	
 	tipPressure=inReport[6]|inReport[7]<<8;
 
+// #define DEBUG
+	
 #ifdef DEBUG
 	printf("xCoord: %04d\t",xCoord);
 	printf("yCoord: %04d\t",yCoord);
@@ -261,7 +267,41 @@ void handleAbsoluteReport(uint8_t * inReport)
 	if (inReport[5] & BS1mask) printf("BS1 "); else printf("--- ");
 	if (inReport[5] & BS2mask) printf("BS2 "); else printf("--- ");
 #endif	
-		
+	
+#undef DEBUG 
+
+	// tabletKeys is a feature available if you run a 4:3 tablet in 16:10 or 16:9 mode
+	// in this case you have an active tablet area that maps outside the screen estate
+	// 
+	// the default is to map everything below the lower bounds of the tablet to the lower bound
+	//
+	// introducing tabletKeys you now have 8 additional keys that you can map actions
+	// to
+	// if your tablet hasn't any built in function keys, you now have at least theses
+	// eight at hand
+	//
+	if ((yCoord>tabletMapping.origin.y + tabletMapping.size.height+100) && tabletKeys) {
+		if((inReport[5] & TIPmask) && !buttonPressed && (tipPressure>compensation))
+		{
+			buttonPressed=true;
+			stylus.off_tablet=TRUE;
+			return((xCoord*noOfTabletKeys/tabletMapping.size.width)+1);
+
+		}
+		else {
+			if (!(inReport[5] & TIPmask)) {
+				buttonPressed=false;
+			}
+
+			stylus.off_tablet=TRUE;
+			return(-1);
+		}
+
+			
+	}
+	else
+	{
+	buttonPressed=false;
 	// Remember the old position for tracking relative motion
 	stylus.old.x = stylus.point.x;
 	stylus.old.y = stylus.point.y;
@@ -305,25 +345,48 @@ void handleAbsoluteReport(uint8_t * inReport)
 	}
 	
 	// set the button state in the current stylus state
+
 	SetButtons(bm);
 	
 	//
 	// proximity
 	//
 	
+
 	stylus.off_tablet = ((inReport[5] & IRmask)==0)?TRUE:FALSE;	
-	
+
+	}
+	return(0);
 }
 
+// use soft keys to do some changes to the tablet's state,
+// invoke script commands or simulate keystrokes
+//
+// starting with 03/2012 I have added a feature to allow
+// users to override my default actions
+//
+// I have not yet added support for keystroke configuration
+//
+// softkeys is at the moment synonym for functions keys
+// to be picked with the stylus (as seen on 12000U) and
+// tablet keys which reuse the otherwise inactive area of
+// an 4:3 tablet operating in 16:10 mode
+//
+// 12000U has 24 softkeys - this function defines a standard
+// action for most of these keys
 void handleSoftKeys(int softKey)
-// use soft keys to do some changes to the tablet's state
 {
+	if (handleCustomActions(softKey)!=true)
+	{	
+	
 	switch (softKey) {
 		case 1:
 			pressVirtualKeyWithModifiers(kVK_ANSI_N, NX_COMMANDMASK);
 			break;
 		case 2:
-			pressVirtualKeyWithModifiers(kVK_ANSI_O, NX_COMMANDMASK);
+//			pressVirtualKeyWithModifiers(kVK_ANSI_O, NX_COMMANDMASK);
+			pressVirtualKeyWithModifiers(kVK_ANSI_O, 0);
+
 			break;
 		case 3:
 			pressVirtualKeyWithModifiers(kVK_ANSI_W, NX_COMMANDMASK);
@@ -348,8 +411,10 @@ void handleSoftKeys(int softKey)
 			pressVirtualKeyWithModifiers(kVK_ANSI_Y, NX_COMMANDMASK);
 			break;
 		
-		case 10:
-			system("osascript -e 'tell application \"System Preferences\" to activate' 2> /dev/null");
+		case 10:			
+				system("osascript -e 'tell application \"System Preferences\" to activate' 2> /dev/null");
+			
+			
 			break;
 			
 		case 11:
@@ -394,7 +459,8 @@ void handleSoftKeys(int softKey)
 		case 20:
 			pressVirtualKeyWithModifiers(kVK_F11, 0);
 			break;
-			
+
+			/*
 		case 21:
 			InitTabletBounds(500, 500, 3500, 2750);
 			puts("shrinking tablet bounds");
@@ -404,7 +470,7 @@ void handleSoftKeys(int softKey)
 			puts("resetting tablet bounds");
 			break;
 			
-			// acase 23:	
+			// case 23:	
 		case 30:
 			issueCommand(currentDeviceRef, switchToMouse);
 			mouse_mode=TRUE;
@@ -418,8 +484,149 @@ void handleSoftKeys(int softKey)
 			stylus.off_tablet = TRUE;
 			mouse_mode=FALSE;
 			break;
-		default:
+*/
+		case 21:
+			stylus.tilt.x-=1820;
+			
+			// stylus.tilt.x=0x7fff;
 			break;
+			
+		case 22:
+			stylus.tilt.x+=1820;
+			break;
+
+		case 23:
+			ResetStylus();
+			stylus.toolid=kToolPen1;
+			stylus.proximity.deviceID = 0x81;
+			stylus.proximity.uniqueID=0x0815;
+			stylus.serialno=0x0815;
+			break;
+			
+			
+		case 24:
+			ResetStylus();
+			stylus.toolid=kToolInkingPen;
+			stylus.proximity.deviceID = 0x82;
+			stylus.proximity.uniqueID=0x04722;
+			stylus.serialno=0x4722;
+			break;
+			
+			 default:
+			break;
+	
+	}
+	}
+}
+
+
+// every space in the original string will be removed
+// the result is copied to another string
+
+void unspaceString(char * orig, char * to)
+{
+	char *i=(char*)orig, *j=(char*)to;  
+	
+	do {  
+  		if (*i != ' ')  
+			*(j++) = *i;
+		/*
+		else
+		{
+			*(j++)= '\\';
+			*(j++)=' ';
+		} 
+		 */
+	} while (*(i++));  
+}
+
+// this is the place where we look up scripts
+// available as custom user actions
+// 
+// the action scripts have to be saved in a directory below the
+// driver
+// common/ contains actions that will be kicked off if there is
+// no custom action defined for the foreground application
+// <AppName>/ contains actions for a specific foreground application
+// e.g. Finder/01.command will be kicked off if the user selects
+// softkey 01 while the Finder is foreground application
+// using this approch there would #softkeys*#applications actions
+// available
+//
+// for this to work correctly never remove the script frontApp.command
+// from the common directory - otherwise the driver doesn't know which
+// application is the frontmost
+//
+bool handleCustomActions(int softKey)
+{
+	FILE * handle;
+	char commandFile[128];
+	char frontApp[128];
+	char frontAppPosix[128];
+	
+	char answer[128];
+
+	
+	// first read the application name of the foreground
+	// application
+	
+	sprintf(commandFile,"common/frontApp.command");
+	handle=fopen(commandFile, "r");
+	if (handle) {
+		fclose(handle);
+		handle=popen(commandFile,"r");
+		fscanf(handle,"%[a-zA-Z0-9 ]",frontApp);
+		pclose(handle);
+		printf("front Application: %s\n",frontApp);
+	} 
+	
+	// remove all spaces from the application name (e.g. 'AppleScript Editor'
+	// gets 'AppleScriptEditor')
+	
+	unspaceString(frontApp, frontAppPosix);
+	sprintf(commandFile,"%s/%02d.command",frontAppPosix,softKey);
+	
+	// check if action script is defined for the frontmost application
+	// only if the script exists, execute it
+	puts(commandFile);
+	handle=fopen(commandFile, "r");
+	if (handle) {
+		fclose(handle);
+#define STD
+#ifdef STD 
+		system(commandFile);
+#else
+		handle=popen(commandFile,"r");
+	// fread(answer, 1, 128, handle);
+		fscanf(handle,"%[a-zA-Z0-9 ]",answer);
+		pclose(handle);
+		printf("got answer: %s\n",answer);
+#endif
+		return(true);
+	}
+	else
+	{
+		// check if common action script is defined
+		sprintf(commandFile,"common/%02d.command",softKey);
+		handle=fopen(commandFile, "r");
+		if (handle) {
+			fclose(handle);
+#ifdef STD 
+			system(commandFile);
+#else
+			handle=popen(commandFile,"r");
+			// fread(answer, 1, 128, handle);
+			fscanf(handle,"%[a-zA-Z0-9 ]",answer);
+			pclose(handle);
+			printf("got answer: %s\n",answer);
+#endif
+#undef STD
+			return(true);
+		}
+		else
+			// if the caller gets false as a return it knows
+			// that no action has been selected
+			return(false);
 	}
 }
 
@@ -457,9 +664,11 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 	int deltaX;
 	int deltaY;
 	UInt16	bm = 0; // button mask
+	int ret;
 	
 	static uint8_t key; // macro key handling
 		
+	// printf("report ID:%d\n", reportID);
 	switch (reportID) {
 		// this needs to be refactored, so I don't interpret the commands directly in the switch
 		// but delegate similar to the absolute reports
@@ -512,22 +721,41 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 			break;
 			
 		case kAbsoluteStylus:
-			handleAbsoluteReport(inReport);
 #ifdef DEBUG
-			puts("\tStylus\n");
+			puts("\Stylus\n");
 #endif
-			PostChangeEvents();
+			ret=handleAbsoluteReport(inReport);
 			
+			switch (ret) {
+				case -1:
+					break;
+
+				case 0:
+					PostChangeEvents();
+					break;
+				default:
+					handleSoftKeys(ret);
+					break;
+			}
 			break;
 			
-		case kAbsoluteMouse:
-			
-			handleAbsoluteReport(inReport);
+		case kAbsoluteMouse:			
 #ifdef DEBUG
 			puts("\tMouse\n");
 #endif
-			PostChangeEvents();
+			ret=handleAbsoluteReport(inReport);
 			
+			switch (ret) {
+				case -1:
+					break;
+					
+				case 0:
+					PostChangeEvents();
+					break;
+				default:
+					handleSoftKeys(ret);
+					break;
+			}
 			break;
 			
 		case kMacroStylus:
@@ -542,9 +770,6 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 					handleSoftKeys(inReport[3]/2);
 				}
 			}
-					
-			
-
 			break;
 
 		case kMacroMouse:
@@ -557,7 +782,6 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 					key=99;	// reset state
 				}
 			}
-			
 			break;
 			
 		default:
@@ -1214,7 +1438,7 @@ void InitStylus() {
 	|	NX_TABLET_CAPABILITY_TILTYMASK
 	//		|	NX_TABLET_CAPABILITY_ABSZMASK
 	|	NX_TABLET_CAPABILITY_PRESSUREMASK
-	//		|	NX_TABLET_CAPABILITY_TANGENTIALPRESSUREMASK
+	|	NX_TABLET_CAPABILITY_TANGENTIALPRESSUREMASK
 	//		|	NX_TABLET_CAPABILITY_ORIENTINFOMASK
 	//		|	NX_TABLET_CAPABILITY_ROTATIONMASK
 	;
@@ -1314,7 +1538,7 @@ int main (int argc, char * argv[]) {
 	vendor=VendorID;
 	
 
-	while((opt = getopt(argc, argv, "v:p:w:h:x:y:c:o")) != -1) {
+	while((opt = getopt(argc, argv, "v:p:w:h:x:y:c:o:t")) != -1) {
 		switch(opt) {
 			case 'o':
 				print_help(0);
@@ -1341,6 +1565,10 @@ int main (int argc, char * argv[]) {
 			case 'c':						// callibration value to compensate mechanical restrictions
 				compensation=atoi(optarg);
 				break;
+			case 't':
+				tabletKeys=true;
+				break;
+
 
 			case ':':
 				fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
