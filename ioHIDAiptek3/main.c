@@ -156,6 +156,21 @@ int compensation=0;
 int noOfTabletKeys=8;
 bool tabletKeys=false;
 
+#define ringLenght 32
+int ringDepth;
+int X[ringLenght]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int Y[ringLenght]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+int headX=0;
+int tailX;
+long accuX=0;
+
+int headY=0;
+int tailY;
+long accuY=0;
+
+int avarage=1;
+
 // forward declare
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
 								   uint32_t reportID, uint8_t *inReport, CFIndex length);
@@ -188,6 +203,14 @@ IOReturn issueCommand(IOHIDDeviceRef deviceRef, uint8_t * command)
 								3);
 }
 
+//
+// ShortSleep
+//
+/*void ShortSleep2() {
+	struct timespec rqtp = { 0, 50000000 };
+	nanosleep(&rqtp, NULL);
+}
+*/
 // theDeviceMatchingTablet() is called as soon as either a device is already plugged in when the
 // application is starting or the device is connected while the application is running
 //
@@ -201,13 +224,22 @@ void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSende
 	
 	// initialize the tablet to get it going
 	
+	//
+	ShortSleep2();
+	
 	// turn on digitizer mode
 	ioReturn=issueCommand(inIOHIDDeviceRef, switchToTablet);
 	mouse_mode=FALSE;
-	
+
+	//
+	ShortSleep2();
+
 	// turn on macro key mode
 	ioReturn=issueCommand(inIOHIDDeviceRef, enableMacroKeys);
 	
+	//
+	ShortSleep2();
+
 	// turn on auto gain
 	ioReturn=issueCommand(inIOHIDDeviceRef,autoGainOn);
 	
@@ -226,6 +258,7 @@ void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSende
 	
 	
 }
+
 
 
 // handleAbsoluteReport() is the entry point for processing the
@@ -251,7 +284,20 @@ int handleAbsoluteReport(uint8_t * inReport)
 	ResetButtons;  // forget the system buttons and reconstruct them in this routine
 	
 	xCoord=inReport[1]|inReport[2]<<8;
+	
+	X[headX]=xCoord;
+	
+	accuX+=X[headX++]-X[tailX++];
+	headX%=(ringDepth<<1);
+	tailX%=(ringDepth<<1);
+	
 	yCoord=inReport[3]|inReport[4]<<8;
+
+	Y[headY]=yCoord;
+	
+	accuY+=Y[headY++]-Y[tailY++];
+	headY%=(ringDepth<<1);
+	tailY%=(ringDepth<<1);
 	
 	tipPressure=inReport[6]|inReport[7]<<8;
 
@@ -307,9 +353,12 @@ int handleAbsoluteReport(uint8_t * inReport)
 	stylus.old.y = stylus.point.y;
 	
 	// store new postion
-	stylus.point.x=xCoord;
-	stylus.point.y=yCoord;
-	
+	// stylus.point.x=xCoord;
+	stylus.point.x=accuX>>avarage;
+		
+	// stylus.point.y=yCoord;
+	stylus.point.y=accuY>>avarage;
+		
 	// calculate difference
 	stylus.motion.x = stylus.point.x - stylus.old.x;
 	stylus.motion.y = stylus.point.y - stylus.old.y; // point und old werden in tablet koordinaten übertragen
@@ -1487,7 +1536,7 @@ void ResetStylus() {
 
 // 
 void print_help(int exval) {
-	printf("%s [-v ID] [-p ID] [-w WIDTH] [-h HEIGHT] [-x X-OFFSET] [-y Y-OFFSET] [-c COMPENSATION]\n\n", "hyperpenDaemon");
+	printf("%s [-v ID] [-p ID] [-w WIDTH] [-h HEIGHT] [-x X-OFFSET] [-y Y-OFFSET] [-c COMPENSATION] [-a {1|2|3|4}]\n\n", "hyperpenDaemon");
 	
 	printf("  -v ID				set vendor  (e.g. 0x08ca)\n");
 	printf("  -p ID				set product (e.g. 0x0010)\n");
@@ -1499,7 +1548,8 @@ void print_help(int exval) {
 	printf("  -y Y-OFFSET		set tablet y offset (e.g. 0)\n");
 	
 	
-	printf("  -c COMPENSATION	compensate mechanical restriction (0-256)\n\n");
+	printf("  -c COMPENSATION	compensate mechanical restriction (0-256)\n");
+	printf("  -a {1|2|3|4}		averages multiple samples to reduce jitter (1=2 samples, 4=16 samples)\n\n");
 	
 	exit(exval);
 }
@@ -1531,6 +1581,7 @@ int main (int argc, char * argv[]) {
 	int offsetX=0;
 	int offsetY=0;
 
+
 // Aiptek HyperPen 12000U
 // taken from the top defines
 	
@@ -1538,7 +1589,7 @@ int main (int argc, char * argv[]) {
 	vendor=VendorID;
 	
 
-	while((opt = getopt(argc, argv, "v:p:w:h:x:y:c:o:t")) != -1) {
+	while((opt = getopt(argc, argv, "v:p:w:h:x:y:c:o:ta:")) != -1) {
 		switch(opt) {
 			case 'o':
 				print_help(0);
@@ -1568,6 +1619,12 @@ int main (int argc, char * argv[]) {
 			case 't':
 				tabletKeys=true;
 				break;
+			case 'a':
+				avarage=atoi(optarg);
+				avarage=(avarage<1)?1:avarage;
+				avarage=(avarage>4)?4:avarage;
+				break;
+
 
 
 			case ':':
@@ -1587,7 +1644,12 @@ int main (int argc, char * argv[]) {
 	printf("Offset X: %d\n",offsetX);
 	printf("Offset Y: %d\n",offsetY);
 	printf("Compensation: %d\n", compensation);
+	printf("Avarage: %d\n", avarage);
 	
+	ringDepth=1<<avarage;
+	
+	tailX=ringDepth;
+	tailY=ringDepth;
 	
 	ioHidManager=IOHIDManagerCreate(kIOHIDOptionsTypeNone,0);
 	
