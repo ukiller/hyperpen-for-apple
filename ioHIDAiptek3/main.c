@@ -1,5 +1,5 @@
 /* 
- (c) Udo Killermann 2011
+ (c) Udo Killermann 2012
  
  Tablet State and Event Processing taken in major parts from
  Tablet Magic Daemon Sources (c) 2011 Thinkyhead Software
@@ -160,6 +160,8 @@ bool tabletKeys=false;
 int ringDepth;
 int X[ringLenght]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 int Y[ringLenght]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int P[ringLenght]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
 
 int headX=0;
 int tailX;
@@ -168,6 +170,10 @@ long accuX=0;
 int headY=0;
 int tailY;
 long accuY=0;
+
+int headP=0;
+int tailP;
+long accuP=0;
 
 int avarage=1;
 
@@ -299,7 +305,6 @@ int handleAbsoluteReport(uint8_t * inReport)
 	headY%=(ringDepth<<1);
 	tailY%=(ringDepth<<1);
 	
-	tipPressure=inReport[6]|inReport[7]<<8;
 
 // #define DEBUG
 	
@@ -362,16 +367,22 @@ int handleAbsoluteReport(uint8_t * inReport)
 	// calculate difference
 	stylus.motion.x = stylus.point.x - stylus.old.x;
 	stylus.motion.y = stylus.point.y - stylus.old.y; // point und old werden in tablet koordinaten übertragen
-	
-	
+
+		
 	// constrain tip pressure to 511 (9 Bit)	
 	// hyperpen Mini spports 1023 pressure levels (10 Bit)
 	
+	tipPressure=inReport[6]|inReport[7]<<8;
 	tipPressure=(tipPressure>511+compensation)?511+compensation:tipPressure;
-	
 	tipPressure=(tipPressure<compensation)?0:tipPressure-compensation;
 	
-	
+	P[headP]=tipPressure;
+	accuP+=P[headP++]-P[tailP++];
+	headP%=(ringDepth<<1);
+	tailP%=(ringDepth<<1);
+		
+	tipPressure=accuP>>avarage;
+		
 	// tablet events are scaled to 0xFFFF (16 bit), so
 	// a little shift to the right is needed
 	stylus.pressure=(tipPressure<<7 | 0x3f); 
@@ -922,7 +933,7 @@ void InitTabletBounds(SInt32 x1, SInt32 y1, SInt32 x2, SInt32 y2) {
 //
 // UpdateDisplaysBounds
 //
-bool UpdateDisplaysBounds() {
+bool UpdateDisplaysBounds2() {
 	//	CGRect				activeDisplaysBounds;
 	CGDirectDisplayID	*displays;
 	CGDisplayCount		numDisplays;
@@ -955,7 +966,47 @@ exit:
 	return result;
 }
 
-void SetScreenMapping(SInt16 x1, SInt16 y1, SInt16 x2, SInt16 y2) {
+bool UpdateDisplaysBounds(SInt16 displayID) {
+	//	CGRect				activeDisplaysBounds;
+	CGDirectDisplayID	*displays;
+	CGDisplayCount		numDisplays;
+	CGDisplayCount		i;
+	CGDisplayErr		err;
+	bool				result = false;
+	
+	screenBounds = CGRectMake(0.0, 0.0, 0.0, 0.0);
+	
+	err = CGGetActiveDisplayList(0, NULL, &numDisplays);
+	
+	if (err == CGDisplayNoErr && numDisplays > 0) {
+		displays = (CGDirectDisplayID*)malloc(numDisplays * sizeof(CGDirectDisplayID));
+		
+		if (NULL != displays) {
+			err = CGGetActiveDisplayList(numDisplays, displays, &numDisplays);
+			
+			if (err == CGDisplayNoErr)
+				if (displayID==-1 || numDisplays<displayID) {
+					for (i = 0; i < numDisplays; i++)
+						screenBounds = CGRectUnion(screenBounds, CGDisplayBounds(displays[i]));
+				}
+				else {
+					screenBounds=CGDisplayBounds(displays[displayID]);
+				}
+
+			
+			free(displays);
+			result = true;
+		}
+	}
+	
+exit:
+	printf("Screen Boundary: %.2f, %.2f - %.2f, %.2f\n", screenBounds.origin.x, screenBounds.origin.y, 
+		   screenBounds.size.width, screenBounds.size.height);
+	return result;
+}
+
+
+void SetScreenMapping2(SInt16 x1, SInt16 y1, SInt16 x2, SInt16 y2) {
 	x1 = (x1 == -1) ? 0 : x1;
 	y1 = (y1 == -1) ? 0 : y1;
 	
@@ -966,6 +1017,63 @@ void SetScreenMapping(SInt16 x1, SInt16 y1, SInt16 x2, SInt16 y2) {
 							   );
 }
 
+void SetScreenMapping(SInt16 left, SInt16 top, SInt16 width, SInt16 height) {
+	SInt16 mappedWidth;
+	SInt16 mappedHeight;
+	
+	if (left==-1) {
+		left=0;
+	}
+
+	if (top==-1) {
+		top=0;
+	}
+
+	if (width==-1) {
+		if (left<0) {
+			mappedWidth=abs(left);
+		}
+		else {
+			mappedWidth=screenBounds.size.width - left;
+		}
+	}
+	else {
+		if (left<0) {
+			mappedWidth=abs(left);
+		}
+		else {
+			mappedWidth=width - left;
+		}
+	}
+	
+	if (height==-1) {
+		if (top<0) {
+			mappedHeight=height;
+		}
+		else {
+			mappedHeight=screenBounds.size.height - top;
+		}
+	}
+	else {
+		if (top<0) {
+			mappedHeight=height;
+		}
+		else {
+			mappedHeight=height - top;
+		}
+	}
+	
+	
+
+	screenMapping = CGRectMake(
+							   left, top,
+							   mappedWidth,
+							   mappedHeight
+							   );
+	
+	printf("Screen Mapping: %.2f, %.2f - %.2f, %.2f\n", screenMapping.origin.x, screenMapping.origin.y, 
+		   screenMapping.size.width, screenMapping.size.height);
+}
 
 
 //
@@ -988,29 +1096,32 @@ void PostChangeEvents() {
 	//
 	// Get Screen and Tablet areas
 	//
-	/*
+	
 	CGFloat	swide = screenMapping.size.width, shigh = screenMapping.size.height,
 	twide = tabletMapping.size.width, thigh = tabletMapping.size.height;
-	*/
+	
+/* 
 #define swide screenMapping.size.width
 #define	shigh	screenMapping.size.height
 #define	twide	tabletMapping.size.width
 #define thigh	tabletMapping.size.height
+*/
 	//
 	// Get the Screen Boundary
 	//
+/*
 #define	sx1	screenMapping.origin.x
 #define	sy1	screenMapping.origin.y
 #define sx2 screenMapping.size.width
 #define sy2 screenMapping.size.height
-
-	/*
+*/
+	
 	CGFloat	sx1 = screenMapping.origin.x,
 	sy1 = screenMapping.origin.y;
 	
 	CGFloat sx2=screenMapping.size.width;
 	CGFloat sy2=screenMapping.size.height;
-	*/
+
 	//
 	// And the Tablet Boundary
 	//
@@ -1544,15 +1655,24 @@ void print_help(int exval) {
 	printf("  -w WIDTH			set tablet width  (e.g. 6000)\n");
 	printf("  -h HEIGHT			set tablet height (e.g. 4500)\n");
 
-	printf("  -x X-OFFSET		set tablet x offset (e.g. 0)\n");
-	printf("  -y Y-OFFSET		set tablet y offset (e.g. 0)\n");
+	printf("  -X X-OFFSET		set tablet x offset (e.g. 0)\n");
+	printf("  -Y Y-OFFSET		set tablet y offset (e.g. 0)\n");
 	
 	
 	printf("  -c COMPENSATION	compensate mechanical restriction (0-256)\n");
 	printf("  -a {1|2|3|4}		averages multiple samples to reduce jitter (1=2 samples, 4=16 samples)\n\n");
+
+	printf("  -W WIDTH			set screen width  (e.g. 1920)\n");
+	printf("  -H HEIGHT			set screen height (e.g. 108)\n");
+	
+	printf("  -x X-OFFSET		set screen x offset (e.g. 0)\n");
+	printf("  -y Y-OFFSET		set screen y offset (e.g. 0)\n");
+	
+	printf("  -d  displayID		restrict tablet to displayID only");
 	
 	exit(exval);
 }
+
 // the main as all other code is naive because it assumes everything
 // runs well - allthough every call returns a status code I don't handle
 // them at the moment
@@ -1562,7 +1682,7 @@ void print_help(int exval) {
 //
 int main (int argc, char * argv[]) {
 	
-	fprintf(stderr, "Aiptek Tablet Driver for OSX\nDesigned and tested for HyperPen 12000U\n(c) Udo Killermann 2011\n\n");
+	fprintf(stderr, "Aiptek Tablet Driver for OSX\nDesigned and tested for HyperPen 12000U\n(c) Udo Killermann 2012\n\n");
 	
 	IOHIDManagerRef	ioHidManager;
 	IOReturn ioReturn;
@@ -1581,6 +1701,11 @@ int main (int argc, char * argv[]) {
 	int offsetX=0;
 	int offsetY=0;
 
+	int screenWidth=-1;
+	int screenHeight=-1;
+	int screenOffsetX=-1;
+	int screenOffsetY=-1;
+	int displayID=-1;
 
 // Aiptek HyperPen 12000U
 // taken from the top defines
@@ -1589,7 +1714,7 @@ int main (int argc, char * argv[]) {
 	vendor=VendorID;
 	
 
-	while((opt = getopt(argc, argv, "v:p:w:h:x:y:c:o:ta:")) != -1) {
+	while((opt = getopt(argc, argv, "v:p:w:h:x:y:c:o:ta:W:H:X:Y:d:")) != -1) {
 		switch(opt) {
 			case 'o':
 				print_help(0);
@@ -1624,9 +1749,21 @@ int main (int argc, char * argv[]) {
 				avarage=(avarage<1)?1:avarage;
 				avarage=(avarage>4)?4:avarage;
 				break;
-
-
-
+			case 'W':
+				screenWidth=atoi(optarg);
+				break;
+			case 'H':
+				screenHeight=atoi(optarg);
+				break;
+			case 'X':
+				screenOffsetX=atoi(optarg);
+				break;
+			case 'Y':
+				screenOffsetY=atoi(optarg);
+				break;
+			case 'd':
+				displayID=atoi(optarg);
+				break;
 			case ':':
 				fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
 				print_help(1);
@@ -1643,6 +1780,13 @@ int main (int argc, char * argv[]) {
 	printf("height: %d\n", height);
 	printf("Offset X: %d\n",offsetX);
 	printf("Offset Y: %d\n",offsetY);
+	printf("screen width: %d\n", screenWidth);
+	printf("screen height: %d\n", screenHeight);
+	printf("screen Offset X: %d\n",screenOffsetX);
+	printf("screen Offset Y: %d\n",screenOffsetY);
+	
+	printf("display ID: %d\n", displayID);
+	
 	printf("Compensation: %d\n", compensation);
 	printf("Avarage: %d\n", avarage);
 	
@@ -1650,6 +1794,7 @@ int main (int argc, char * argv[]) {
 	
 	tailX=ringDepth;
 	tailY=ringDepth;
+	tailP=ringDepth;
 	
 	ioHidManager=IOHIDManagerCreate(kIOHIDOptionsTypeNone,0);
 	
@@ -1687,8 +1832,11 @@ int main (int argc, char * argv[]) {
 		// the connected device
 		
 		InitTabletBounds(offsetX, offsetY, width, height);
-		UpdateDisplaysBounds();
-		SetScreenMapping(0,0,-1,-1);
+		UpdateDisplaysBounds(displayID);
+
+		// SetScreenMapping(0,0,-1,-1);
+		
+		SetScreenMapping(screenOffsetX, screenOffsetY, screenWidth, screenHeight);
 		
 		CFRunLoopRun();
 		
