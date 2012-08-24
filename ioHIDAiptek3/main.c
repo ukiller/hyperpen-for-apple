@@ -177,6 +177,9 @@ long accuP=0;
 
 int avarage=1;
 
+int pressureShift=7;
+int maxPressure=0;
+
 // forward declare
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
 								   uint32_t reportID, uint8_t *inReport, CFIndex length);
@@ -373,7 +376,9 @@ int handleAbsoluteReport(uint8_t * inReport)
 	// hyperpen Mini spports 1023 pressure levels (10 Bit)
 	
 	tipPressure=inReport[6]|inReport[7]<<8;
-	tipPressure=(tipPressure>511+compensation)?511+compensation:tipPressure;
+	
+	tipPressure=(tipPressure>maxPressure+compensation)?maxPressure+compensation:tipPressure;
+
 	tipPressure=(tipPressure<compensation)?0:tipPressure-compensation;
 	
 	P[headP]=tipPressure;
@@ -384,10 +389,13 @@ int handleAbsoluteReport(uint8_t * inReport)
 	tipPressure=accuP>>avarage;
 		
 	// tablet events are scaled to 0xFFFF (16 bit), so
-	// a little shift to the right is needed
-	stylus.pressure=(tipPressure<<7 | 0x3f); 
-	
+	// a little shift to the left is needed
 	// for the mini we have to shift only 6 positions
+
+	stylus.pressure=(tipPressure<<pressureShift);
+	
+	// stylus.pressure=(tipPressure<<7 | 0x3f); 
+	
 	
 	// reconstruct the button state
 	// button state is or'ed together using the corresponding bit masks
@@ -1654,7 +1662,8 @@ void print_help(int exval) {
 
 	printf("  -w WIDTH			set tablet width  (e.g. 6000)\n");
 	printf("  -h HEIGHT			set tablet height (e.g. 4500)\n");
-
+	printf("  -l LEVEL			set pressure level (0=512, 1=1024, 2=2048, 4=4096)");
+	
 	printf("  -X X-OFFSET		set tablet x offset (e.g. 0)\n");
 	printf("  -Y Y-OFFSET		set tablet y offset (e.g. 0)\n");
 	
@@ -1668,7 +1677,8 @@ void print_help(int exval) {
 	printf("  -x X-OFFSET		set screen x offset (e.g. 0)\n");
 	printf("  -y Y-OFFSET		set screen y offset (e.g. 0)\n");
 	
-	printf("  -d  displayID		restrict tablet to displayID only");
+	printf("  -d  displayID		restrict tablet to displayID only\n");
+	
 	
 	exit(exval);
 }
@@ -1706,6 +1716,8 @@ int main (int argc, char * argv[]) {
 	int screenOffsetX=-1;
 	int screenOffsetY=-1;
 	int displayID=-1;
+	
+	int pressureLevels=0;
 
 // Aiptek HyperPen 12000U
 // taken from the top defines
@@ -1714,7 +1726,7 @@ int main (int argc, char * argv[]) {
 	vendor=VendorID;
 	
 
-	while((opt = getopt(argc, argv, "v:p:w:h:x:y:c:o:ta:W:H:X:Y:d:")) != -1) {
+	while((opt = getopt(argc, argv, "v:p:w:h:x:y:l:c:ota:W:H:X:Y:d:")) != -1) {
 		switch(opt) {
 			case 'o':
 				print_help(0);
@@ -1764,6 +1776,16 @@ int main (int argc, char * argv[]) {
 			case 'd':
 				displayID=atoi(optarg);
 				break;
+			
+			case 'l':
+				pressureLevels=atoi(optarg);
+				puts("l argument given");
+				
+				pressureLevels=(pressureLevels<0)?0:pressureLevels;
+				pressureLevels=(pressureLevels>4)?4:pressureLevels;
+				
+				break;
+
 			case ':':
 				fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
 				print_help(1);
@@ -1773,6 +1795,12 @@ int main (int argc, char * argv[]) {
 				print_help(1);
 		}
 	}
+
+	// normalize the physical pressure levels to the internal representation
+	pressureShift-=pressureLevels;
+	
+	// caculate maximum physical pressure
+	maxPressure=(1<<(9+pressureLevels))-1;
 	
 	printf("vendor: %x\n",vendor);
 	printf("product: %x\n",product);
@@ -1788,7 +1816,10 @@ int main (int argc, char * argv[]) {
 	printf("display ID: %d\n", displayID);
 	
 	printf("Compensation: %d\n", compensation);
-	printf("Avarage: %d\n", avarage);
+	printf("Average: %d\n", avarage);
+	
+	printf("Pressure level: %d\n", pressureLevels);
+	printf("Physical max level: %d\n", maxPressure);
 	
 	ringDepth=1<<avarage;
 	
