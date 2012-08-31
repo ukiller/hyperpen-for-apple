@@ -180,6 +180,23 @@ int avarage=1;
 int pressureShift=7;
 int maxPressure=0;
 
+
+// #define XP
+
+#ifdef XP
+// pressure adjustments
+typedef struct _series {
+	CFIndex slope;
+	CFIndex yOffset;
+} pressureSeries;
+
+pressureSeries mySeries[5];
+
+int noOfBits;
+int lowMask;
+int highShift;
+#endif
+
 // forward declare
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
 								   uint32_t reportID, uint8_t *inReport, CFIndex length);
@@ -267,6 +284,35 @@ void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSende
 	
 	
 }
+
+#ifdef XP
+
+// don't know why this routine doesn't work for negative slopes
+int adjustPressure(int original)
+{
+	int adjusted;
+	int slope;
+	
+	slope=mySeries[(original>>highShift)].slope;
+	
+	if (slope<0) {
+		slope*=-1;
+		adjusted=mySeries[(original>>highShift)].yOffset-slope*(original & lowMask)/127;
+	}
+	else
+		adjusted=mySeries[(original>>highShift)].yOffset+slope*(original & lowMask)/127;
+	
+	
+#if DEBUG 	
+	printf("			%d %d %d %d\n", slope, (original & lowMask), slope*(original & lowMask), 
+		   adjusted );
+#endif	
+	// & lowMask
+	
+	return(adjusted);
+}
+
+#endif
 
 
 
@@ -387,6 +433,9 @@ int handleAbsoluteReport(uint8_t * inReport)
 	tailP%=(ringDepth<<1);
 		
 	tipPressure=accuP>>avarage;
+#ifdef XP
+	tipPressure=adjustPressure(tipPressure);
+#endif
 		
 	// tablet events are scaled to 0xFFFF (16 bit), so
 	// a little shift to the left is needed
@@ -1652,6 +1701,60 @@ void ResetStylus() {
 
 // <End of TabletMagic Code>
 
+#ifdef XP
+void initPressureCurve()
+{
+	CFStringRef seriesName;
+	
+	CFMutableArrayRef series;
+	CFMutableDictionaryRef element;
+	
+	CFIndex counter;
+	
+	CFIndex slope;
+	CFIndex yOffset;
+	
+	noOfBits=9;
+	lowMask=(1<<(noOfBits-2))-1;
+	highShift=noOfBits-2;
+	
+	printf("noOfBits: %02x\n", noOfBits);
+	printf("lowMask: %02x\n", lowMask);
+	printf("highShift: %02x\n", highShift);
+	
+	
+	series=(CFMutableArrayRef)CFPreferencesCopyAppValue(CFSTR("series"), CFSTR("de.killermann.hyperpen"));
+	
+	seriesName=(CFStringRef)CFArrayGetValueAtIndex(series,0);
+	
+	
+	for (counter=1; counter<CFArrayGetCount(series); counter++) {
+		element=(CFMutableDictionaryRef)CFArrayGetValueAtIndex(series, counter);
+		
+		CFNumberGetValue(CFDictionaryGetValue(element, CFSTR("slope")),kCFNumberSInt32Type,&slope);
+		CFNumberGetValue(CFDictionaryGetValue(element, CFSTR("yOffset")),kCFNumberSInt32Type,&yOffset);
+		
+		mySeries[counter-1].slope=slope;
+		mySeries[counter-1].yOffset=yOffset;
+		
+	}
+	
+#ifdef DEBUG
+	for (counter=0;counter<4;counter++)
+		printf("yOff=%d slope=%d\n", mySeries[counter].yOffset, mySeries[counter].slope);
+	
+	// 127 is a correction needed because of the way the slope is calculated within the control panel (normalized to one step)
+	
+	for(counter=0;counter<512;counter+=2)
+		//for(counter=127;counter<255;counter+=2)
+		printf("%d,%d\n",counter, adjustPressure(counter));
+	
+#endif	
+	//	CFPreferencesAppSynchronize(CFSTR("de.killermann.hyperpen"));
+}
+
+#endif
+
 
 // 
 void print_help(int exval) {
@@ -1726,7 +1829,7 @@ int main (int argc, char * argv[]) {
 	vendor=VendorID;
 	
 
-	while((opt = getopt(argc, argv, "v:p:w:h:x:y:l:c:ota:W:H:X:Y:d:")) != -1) {
+	while((opt = getopt(argc, argv, "v:p:w:h:x:y:l:c:ota:W:H:X:Y:d:P")) != -1) {
 		switch(opt) {
 			case 'o':
 				print_help(0);
@@ -1785,6 +1888,11 @@ int main (int argc, char * argv[]) {
 				pressureLevels=(pressureLevels>4)?4:pressureLevels;
 				
 				break;
+#ifdef XP				
+			case 'P':
+				initPressureCurve();
+				break;
+#endif
 
 			case ':':
 				fprintf(stderr, "Error - Option `%c' needs a value\n\n", optopt);
