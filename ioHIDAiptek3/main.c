@@ -181,20 +181,20 @@ int pressureShift=7;
 int maxPressure=0;
 
 
-// #define XP
+#define XP
 
 #ifdef XP
-// pressure adjustments
-typedef struct _series {
+typedef struct _profile {
 	CFIndex slope;
 	CFIndex yOffset;
-} pressureSeries;
+} pressureProfile;
 
-pressureSeries mySeries[5];
+pressureProfile currentProfile[5];
 
-int noOfBits;
+
 int lowMask;
 int highShift;
+
 #endif
 
 // forward declare
@@ -293,21 +293,14 @@ int adjustPressure(int original)
 	int adjusted;
 	int slope;
 	
-	slope=mySeries[(original>>highShift)].slope;
+	slope=currentProfile[(original>>highShift)].slope;
 	
 	if (slope<0) {
 		slope*=-1;
-		adjusted=mySeries[(original>>highShift)].yOffset-slope*(original & lowMask)/127;
+		adjusted=currentProfile[(original>>highShift)].yOffset-(slope*(original & lowMask)>>highShift);
 	}
 	else
-		adjusted=mySeries[(original>>highShift)].yOffset+slope*(original & lowMask)/127;
-	
-	
-#if DEBUG 	
-	printf("			%d %d %d %d\n", slope, (original & lowMask), slope*(original & lowMask), 
-		   adjusted );
-#endif	
-	// & lowMask
+		adjusted=currentProfile[(original>>highShift)].yOffset+(slope*(original & lowMask)>>highShift);
 	
 	return(adjusted);
 }
@@ -1702,19 +1695,21 @@ void ResetStylus() {
 // <End of TabletMagic Code>
 
 #ifdef XP
-void initPressureCurve()
+void initPressureCurve(int noOfBits, int profileID)
 {
-	CFStringRef seriesName;
+	CFStringRef profileName;
 	
-	CFMutableArrayRef series;
-	CFMutableDictionaryRef element;
+	CFMutableArrayRef profiles;
+	CFMutableArrayRef profile;
+	
+	CFMutableDictionaryRef profileEntry;
+	CFMutableDictionaryRef profileElement;
 	
 	CFIndex counter;
 	
 	CFIndex slope;
 	CFIndex yOffset;
 	
-	noOfBits=9;
 	lowMask=(1<<(noOfBits-2))-1;
 	highShift=noOfBits-2;
 	
@@ -1723,34 +1718,35 @@ void initPressureCurve()
 	printf("highShift: %02x\n", highShift);
 	
 	
-	series=(CFMutableArrayRef)CFPreferencesCopyAppValue(CFSTR("series"), CFSTR("de.killermann.hyperpen"));
+	profiles=(CFMutableArrayRef)CFPreferencesCopyAppValue(CFSTR("Profiles"), CFSTR("de.killermann.hyperpen"));
 	
-	seriesName=(CFStringRef)CFArrayGetValueAtIndex(series,0);
+	profileEntry=(CFMutableDictionaryRef)CFArrayGetValueAtIndex(profiles, profileID);
 	
+	profileName=(CFStringRef)CFDictionaryGetValue(profileEntry, CFSTR("name"));
 	
-	for (counter=1; counter<CFArrayGetCount(series); counter++) {
-		element=(CFMutableDictionaryRef)CFArrayGetValueAtIndex(series, counter);
+	CFShow(profileName);
+	
+	profile=(CFMutableArrayRef)CFDictionaryGetValue(profileEntry, CFSTR("profile"));
+	
+	//	CFShow(profile);
+	
+	for (counter=0; counter<CFArrayGetCount(profile); counter++) {
+		profileElement=(CFMutableDictionaryRef)CFArrayGetValueAtIndex(profile, counter);
 		
-		CFNumberGetValue(CFDictionaryGetValue(element, CFSTR("slope")),kCFNumberSInt32Type,&slope);
-		CFNumberGetValue(CFDictionaryGetValue(element, CFSTR("yOffset")),kCFNumberSInt32Type,&yOffset);
+		CFNumberGetValue(CFDictionaryGetValue(profileElement, CFSTR("slope")),kCFNumberSInt32Type,&slope);
+		CFNumberGetValue(CFDictionaryGetValue(profileElement, CFSTR("yOffset")),kCFNumberSInt32Type,&yOffset);
 		
-		mySeries[counter-1].slope=slope;
-		mySeries[counter-1].yOffset=yOffset;
+		currentProfile[counter].slope=slope<<(noOfBits-9);
+		currentProfile[counter].yOffset=yOffset<<(noOfBits-9);
 		
 	}
 	
-#ifdef DEBUG
-	for (counter=0;counter<4;counter++)
-		printf("yOff=%d slope=%d\n", mySeries[counter].yOffset, mySeries[counter].slope);
+	CFRelease(profileElement);
+	CFRelease(profile);
+	CFRelease(profileName);
+	CFRelease(profileEntry);
+	CFRelease(profiles);
 	
-	// 127 is a correction needed because of the way the slope is calculated within the control panel (normalized to one step)
-	
-	for(counter=0;counter<512;counter+=2)
-		//for(counter=127;counter<255;counter+=2)
-		printf("%d,%d\n",counter, adjustPressure(counter));
-	
-#endif	
-	//	CFPreferencesAppSynchronize(CFSTR("de.killermann.hyperpen"));
 }
 
 #endif
@@ -1820,7 +1816,7 @@ int main (int argc, char * argv[]) {
 	int screenOffsetY=-1;
 	int displayID=-1;
 	
-	int pressureLevels=0;
+	int pressureLevels=0; // 512 levels
 
 // Aiptek HyperPen 12000U
 // taken from the top defines
@@ -1829,7 +1825,7 @@ int main (int argc, char * argv[]) {
 	vendor=VendorID;
 	
 
-	while((opt = getopt(argc, argv, "v:p:w:h:x:y:l:c:ota:W:H:X:Y:d:P")) != -1) {
+	while((opt = getopt(argc, argv, "v:p:w:h:x:y:l:c:ota:W:H:X:Y:d:P:")) != -1) {
 		switch(opt) {
 			case 'o':
 				print_help(0);
@@ -1882,7 +1878,7 @@ int main (int argc, char * argv[]) {
 			
 			case 'l':
 				pressureLevels=atoi(optarg);
-				puts("l argument given");
+				// puts("l argument given");
 				
 				pressureLevels=(pressureLevels<0)?0:pressureLevels;
 				pressureLevels=(pressureLevels>4)?4:pressureLevels;
@@ -1890,7 +1886,7 @@ int main (int argc, char * argv[]) {
 				break;
 #ifdef XP				
 			case 'P':
-				initPressureCurve();
+				initPressureCurve(9+pressureLevels, atoi(optarg));
 				break;
 #endif
 
