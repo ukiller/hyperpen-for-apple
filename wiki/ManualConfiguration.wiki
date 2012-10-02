@@ -1,6 +1,6 @@
 == Options ==
 
-If you start the driver within the Terminal application with the option _-?_ it will show you the available options:
+If you start the driver from the command line with option _-?_ it will show you the available options:
 {{{
 hyperpenDaemon [-v ID] [-p ID] [-w WIDTH] [-h HEIGHT] [-x X-OFFSET] [-y Y-OFFSET] [-c COMPENSATION] [-a {1|2|3|4}]
 
@@ -20,7 +20,7 @@ hyperpenDaemon [-v ID] [-p ID] [-w WIDTH] [-h HEIGHT] [-x X-OFFSET] [-y Y-OFFSET
   -d  displayID		restrict tablet to displayID only
 }}}
 
-The options shown in the first line are only a subset of the options available. The full set of official options are shown above.
+The options shown in the first line are only a subset of the available options. The full set of official options are shown above.
 
 == Examples ==
 
