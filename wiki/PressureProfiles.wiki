@@ -21,4 +21,4 @@ http://hyperpen-for-apple.googlecode.com/svn/wiki/pressureProfiles/hard-20121001
 
 http://hyperpen-for-apple.googlecode.com/svn/wiki/pressureProfiles/soft-20121001.jpg
 
-You change the slope of a segment by activating the appropriate slider (checkbox below) and slide it to the desired height. If you don't just want to interpolate two segments just deactivate the slider in between start and end point.
+You change the slope of a segment by activating the appropriate slider (checkbox below) and slide it to the desired height. If you just want to interpolate two segments just deactivate the slider in between start and end point.
