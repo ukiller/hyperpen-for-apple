@@ -1,5 +1,6 @@
 /* 
  (c) Udo Killermann 2012
+ --
  
  Tablet State and Event Processing taken in major parts from
  Tablet Magic Daemon Sources (c) 2011 Thinkyhead Software
@@ -72,11 +73,14 @@
 // #include "vkeys.h"
 
 // Aiptek
-#define VendorID  0x08ca
+// #define VendorID  0x08ca
 
 // HyperPen 12000U
-#define ProductID 0x0010
+// #define ProductID 0x0010
 
+
+void ShortSleep();
+void ResetStylus();
 
 void PostNXEvent(int eventType, SInt16 eventSubType, UInt8 otherButton);
 void PostChangeEvents();
@@ -152,12 +156,13 @@ char * buttonNames[] = {"dummy","button 1","button 2","button 3","button 4","but
 
 
 
-int compensation=0;
 int noOfTabletKeys=8;
 bool tabletKeys=false;
 
 #define ringLenght 32
 int ringDepth;
+
+// x,y coordinates and pressure level
 int X[ringLenght]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 int Y[ringLenght]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 int P[ringLenght]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -175,10 +180,40 @@ int headP=0;
 int tailP;
 long accuP=0;
 
-int avarage=1;
+int average=1;
 
 int pressureShift=7;
 int maxPressure=0;
+
+// structure stores the different settings of the driver in one place
+// it is declared as a global variable, so we can use it without the 
+// need to pass it arround in every call
+
+typedef struct _settings {
+	int displayID;
+	int tabletWidth;
+	int tabletHeight;
+	int tabletOffsetX;
+	int tabletOffestY;
+	int compensation;
+	int average;
+	int pressureLevels;
+	int screenWidth;
+	int screenHeight;
+	int screenOffsetX;
+	int screenOffsetY;
+	int vendorID;
+	int productID;
+	int activeProfile;
+	bool tabletKeys;
+	int noOfTabletKeys;
+	bool mouseMode;
+} settings;
+
+// initialize settings for Hyperpen 12000U (first tablet I wrote the driver for)
+
+settings hpSettings={-1,6000,4500,0,0,0,0,0,-1,-1,-1,-1,0x08ca,0x0010,0,false,8,false};
+
 
 
 #define XP
@@ -190,6 +225,7 @@ typedef struct _profile {
 } pressureProfile;
 
 pressureProfile currentProfile[5];
+pressureProfile linearProfile[5]={{128,0},{128,128},{128,256},{128,384},{0,512}};
 
 
 int lowMask;
@@ -207,6 +243,7 @@ void HIDPostVirtualKey(const UInt8 inVirtualKeyCode, const Boolean inPostUp, con
 
 void pressVirtualKeyWithModifiers(UInt8 inVirtualKeyCode, UInt32 gModifiers);
 bool handleCustomActions(int softKey);
+
 
 // unschedule events fired by the device from run loop
 void theDeviceRemovalCallback (void *context, IOReturn result, void *sender, IOHIDDeviceRef device)
@@ -242,6 +279,19 @@ IOReturn issueCommand(IOHIDDeviceRef deviceRef, uint8_t * command)
 //
 // initialize the matching device (aiptek tablet) and register the event handler with the run loop
 // afterwards input reports will be send to this event handler 
+
+//
+// ShortSleep
+//
+// void ShortSleep() {
+//	struct timespec rqtp = { 0, 50000000 };
+//	nanosleep(&rqtp, NULL);
+//}
+
+// Short Sleep is not needed on my MacBook
+// so I override it
+#define ShortSleep() ;
+
 void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSender, IOHIDDeviceRef  inIOHIDDeviceRef)
 {
 	IOReturn ioReturn;
@@ -251,28 +301,27 @@ void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSende
 	// initialize the tablet to get it going
 	
 	//
-	ShortSleep2();
+	ShortSleep();
 	
 	// turn on digitizer mode
 	ioReturn=issueCommand(inIOHIDDeviceRef, switchToTablet);
 	mouse_mode=FALSE;
 
 	//
-	ShortSleep2();
+	ShortSleep();
 
 	// turn on macro key mode
 	ioReturn=issueCommand(inIOHIDDeviceRef, enableMacroKeys);
 	
 	//
-	ShortSleep2();
+	ShortSleep();
+
+	
+	// turn on filter
+	ioReturn=issueCommand(inIOHIDDeviceRef, filterOn);
 
 	// turn on auto gain
 	ioReturn=issueCommand(inIOHIDDeviceRef,autoGainOn);
-	
-	
-	// turn on filter
-	// ioReturn=issueCommand(currentDeviceRef, filterOn);
-	
 	
 	// set Resolution
 	// ioReturn=issueCommand(currentDeviceRef, setResolution);	
@@ -281,13 +330,10 @@ void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSende
 	fprintf(stderr,"Tablet connected!\n");
 	IOHIDDeviceScheduleWithRunLoop(inIOHIDDeviceRef, CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
 	IOHIDDeviceRegisterInputReportCallback(inIOHIDDeviceRef, buffer, 512, theInputReportCallback, "hund katze maus");
-	
-	
 }
 
 #ifdef XP
 
-// don't know why this routine doesn't work for negative slopes
 int adjustPressure(int original)
 {
 	int adjusted;
@@ -321,11 +367,13 @@ int adjustPressure(int original)
 // essantially this routine converts the raw information received by the Aiptek Tablet
 // to the logical tablet and stylus state represented by TabletMagic's code
 //
-int handleAbsoluteReport(uint8_t * inReport)
+void handleAbsoluteReport(uint8_t * inReport)
 {
 	int xCoord;
 	int yCoord;
 	int tipPressure;
+
+	
 	UInt16	bm = 0; // button mask
 	static bool buttonPressed=false; 
 	
@@ -348,52 +396,6 @@ int handleAbsoluteReport(uint8_t * inReport)
 	tailY%=(ringDepth<<1);
 	
 
-// #define DEBUG
-	
-#ifdef DEBUG
-	printf("xCoord: %04d\t",xCoord);
-	printf("yCoord: %04d\t",yCoord);
-	printf("Tip Pressure: %03d\t\t",tipPressure);
-	if (inReport[5] & DVmask) printf("DV "); else printf("-- ");
-	if (inReport[5] & IRmask) printf("IR "); else printf("-- "); // generate Proximity Event
-	if (inReport[5] & TIPmask) printf("TIP "); else printf("--- ");
-	if (inReport[5] & BS1mask) printf("BS1 "); else printf("--- ");
-	if (inReport[5] & BS2mask) printf("BS2 "); else printf("--- ");
-#endif	
-	
-#undef DEBUG 
-
-	// tabletKeys is a feature available if you run a 4:3 tablet in 16:10 or 16:9 mode
-	// in this case you have an active tablet area that maps outside the screen estate
-	// 
-	// the default is to map everything below the lower bounds of the tablet to the lower bound
-	//
-	// introducing tabletKeys you now have 8 additional keys that you can map actions
-	// to
-	// if your tablet hasn't any built in function keys, you now have at least theses
-	// eight at hand
-	//
-	if ((yCoord>tabletMapping.origin.y + tabletMapping.size.height+100) && tabletKeys) {
-		if((inReport[5] & TIPmask) && !buttonPressed && (tipPressure>compensation))
-		{
-			buttonPressed=true;
-			stylus.off_tablet=TRUE;
-			return((xCoord*noOfTabletKeys/tabletMapping.size.width)+1);
-
-		}
-		else {
-			if (!(inReport[5] & TIPmask)) {
-				buttonPressed=false;
-			}
-
-			stylus.off_tablet=TRUE;
-			return(-1);
-		}
-
-			
-	}
-	else
-	{
 	buttonPressed=false;
 	// Remember the old position for tracking relative motion
 	stylus.old.x = stylus.point.x;
@@ -401,72 +403,95 @@ int handleAbsoluteReport(uint8_t * inReport)
 	
 	// store new postion
 	// stylus.point.x=xCoord;
-	stylus.point.x=accuX>>avarage;
+	stylus.point.x=accuX>>average;
 		
 	// stylus.point.y=yCoord;
-	stylus.point.y=accuY>>avarage;
+	stylus.point.y=accuY>>average;
 		
 	// calculate difference
+	// point and old are reported in tablet coordinates
 	stylus.motion.x = stylus.point.x - stylus.old.x;
-	stylus.motion.y = stylus.point.y - stylus.old.y; // point und old werden in tablet koordinaten übertragen
-
+	stylus.motion.y = stylus.point.y - stylus.old.y; 
 		
 	// constrain tip pressure to 511 (9 Bit)	
 	// hyperpen Mini spports 1023 pressure levels (10 Bit)
 	
-	tipPressure=inReport[6]|inReport[7]<<8;
+	// tipPressure=inReport[6]|inReport[7]<<8;
+	tipPressure=inReport[6]+inReport[7]*256;
 	
-	tipPressure=(tipPressure>maxPressure+compensation)?maxPressure+compensation:tipPressure;
-
-	tipPressure=(tipPressure<compensation)?0:tipPressure-compensation;
-	
+	// tipPressure=(tipPressure>maxPressure+hpSettings.compensation)?maxPressure:tipPressure;
+	// tipPressure=(tipPressure<hpSettings.compensation)?0:tipPressure-hpSettings.compensation;
+				
+	if (!(inReport[5] & DVmask)) {
+		stylus.off_tablet=TRUE;
+	}
+		
 	P[headP]=tipPressure;
 	accuP+=P[headP++]-P[tailP++];
 	headP%=(ringDepth<<1);
 	tailP%=(ringDepth<<1);
 		
-	tipPressure=accuP>>avarage;
+	tipPressure=accuP>>average;
+	
+	
 #ifdef XP
 	tipPressure=adjustPressure(tipPressure);
 #endif
-		
+	
+	// oldTipPressure=tipPressure;
+	
 	// tablet events are scaled to 0xFFFF (16 bit), so
 	// a little shift to the left is needed
 	// for the mini we have to shift only 6 positions
-
+	
 	stylus.pressure=(tipPressure<<pressureShift);
+	//		stylus.pressure=(oldTipPressure<<pressureShift);
 	
-	// stylus.pressure=(tipPressure<<7 | 0x3f); 
+
+// #define rDEBUG
+		
+#ifdef rDEBUG
+		printf("xCoord: %05d\t",xCoord);
+		printf("yCoord: %05d\t",yCoord);
+		printf("Pressure: %04x\t",tipPressure);
+		printf("sPressure: %04x\t",stylus.pressure);
+		
+		if (inReport[5] & DVmask) printf("DV "); else printf("-- ");
+		if (inReport[5] & IRmask) printf("IR "); else printf("-- "); // generate Proximity Event
+		if (inReport[5] & TIPmask) printf("TIP "); else printf("--- ");
+		if (inReport[5] & BS1mask) printf("BS1 "); else printf("--- ");
+		if (inReport[5] & BS2mask) printf("BS2 \n"); else printf("--- \n");
+#endif	
 	
 	
-	// reconstruct the button state
-	// button state is or'ed together using the corresponding bit masks
+	// construct the button state
+	// button state is or'ed together using the corresponding bit masks		
+	if (!(inReport[5] & TIPmask)) {
+		stylus.pressure=0;
+	}
 	
-	if (inReport[5] & TIPmask && stylus.pressure>0) {
+	if ((inReport[5] & TIPmask) && (stylus.pressure>0)) 
+	{
 		bm|=kBitStylusTip;
 	}
 	
-	if (inReport[5] & BS1mask) {
-		bm|=kBitStylusButton1;
-	}
+		
+		if (inReport[5] & BS1mask) {
+			bm|=kBitStylusButton1;
+		}	
 	
-	if (inReport[5] & BS2mask) {
-		bm|=kBitStylusButton2;
-	}
+		if (inReport[5] & BS2mask) {
+			bm|=kBitStylusButton2;
+		}
 	
+		
 	// set the button state in the current stylus state
-
 	SetButtons(bm);
 	
 	//
 	// proximity
 	//
-	
-
 	stylus.off_tablet = ((inReport[5] & IRmask)==0)?TRUE:FALSE;	
-
-	}
-	return(0);
 }
 
 // use soft keys to do some changes to the tablet's state,
@@ -494,8 +519,8 @@ void handleSoftKeys(int softKey)
 			pressVirtualKeyWithModifiers(kVK_ANSI_N, NX_COMMANDMASK);
 			break;
 		case 2:
-//			pressVirtualKeyWithModifiers(kVK_ANSI_O, NX_COMMANDMASK);
-			pressVirtualKeyWithModifiers(kVK_ANSI_O, 0);
+			pressVirtualKeyWithModifiers(kVK_ANSI_O, NX_COMMANDMASK);
+//			pressVirtualKeyWithModifiers(kVK_ANSI_O, 0);
 
 			break;
 		case 3:
@@ -632,6 +657,7 @@ void handleSoftKeys(int softKey)
 
 // every space in the original string will be removed
 // the result is copied to another string
+// helper function
 
 void unspaceString(char * orig, char * to)
 {
@@ -673,9 +699,11 @@ bool handleCustomActions(int softKey)
 	char commandFile[128];
 	char frontApp[128];
 	char frontAppPosix[128];
-	
-	char answer[128];
 
+#define STD
+#ifndef STD
+	char answer[128];
+#endif
 	
 	// first read the application name of the foreground
 	// application
@@ -702,7 +730,7 @@ bool handleCustomActions(int softKey)
 	handle=fopen(commandFile, "r");
 	if (handle) {
 		fclose(handle);
-#define STD
+
 #ifdef STD 
 		system(commandFile);
 #else
@@ -767,14 +795,12 @@ static int aiptek_convert_from_2s_complement(uint8_t c)
 // packet decoding is based on information provided in Linux's
 // Aiptek tablet driver
 //
-
 static void theInputReportCallback(void *context, IOReturn inResult, void * inSender, IOHIDReportType inReportType, 
 								   uint32_t reportID, uint8_t *inReport, CFIndex length)
 {	
 	int deltaX;
 	int deltaY;
 	UInt16	bm = 0; // button mask
-	int ret;
 	
 	static uint8_t key; // macro key handling
 		
@@ -834,38 +860,16 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 #ifdef DEBUG
 			puts("\Stylus\n");
 #endif
-			ret=handleAbsoluteReport(inReport);
-			
-			switch (ret) {
-				case -1:
-					break;
-
-				case 0:
-					PostChangeEvents();
-					break;
-				default:
-					handleSoftKeys(ret);
-					break;
-			}
+			handleAbsoluteReport(inReport);
+			PostChangeEvents();			
 			break;
 			
 		case kAbsoluteMouse:			
 #ifdef DEBUG
 			puts("\tMouse\n");
 #endif
-			ret=handleAbsoluteReport(inReport);
-			
-			switch (ret) {
-				case -1:
-					break;
-					
-				case 0:
-					PostChangeEvents();
-					break;
-				default:
-					handleSoftKeys(ret);
-					break;
-			}
+			handleAbsoluteReport(inReport);
+			PostChangeEvents();		
 			break;
 			
 		case kMacroStylus:
@@ -900,8 +904,8 @@ static void theInputReportCallback(void *context, IOReturn inResult, void * inSe
 	
 }
 
-//
-
+// this section handles simulation of keypresses - otherwise some
+// of the features (e.g. cmd-o to open a file) wouldn't be available
 
 void HIDPostVirtualModifier(UInt32 gModifiers)
 {
@@ -912,6 +916,8 @@ void HIDPostVirtualModifier(UInt32 gModifiers)
 		
 	IOHIDPostEvent(gEventDriver, NX_FLAGSCHANGED, loc, &eventData, kNXEventDataVersion, gModifiers , TRUE );
 }
+
+//
 	
 void HIDPostVirtualKey(
 							  const UInt8 inVirtualKeyCode,
@@ -938,6 +944,8 @@ void HIDPostVirtualKey(
 	// event.type=
 }
 
+//
+
 void pressVirtualKeyWithModifiers(UInt8 inVirtualKeyCode, UInt32 gModifiers)
 {
 	HIDPostVirtualModifier(gModifiers);
@@ -949,17 +957,6 @@ void pressVirtualKeyWithModifiers(UInt8 inVirtualKeyCode, UInt32 gModifiers)
 
 // <Start of TabletMagic Code>
 
-//
-// ShortSleep
-//
-void ShortSleep2() {
-	struct timespec rqtp = { 0, 50000000 };
-	nanosleep(&rqtp, NULL);
-}
-
-// Short Sleep is not needed on my MacBook
-// so I override it
-#define ShortSleep() ;
 
 
 //
@@ -1125,6 +1122,8 @@ void SetScreenMapping(SInt16 left, SInt16 top, SInt16 width, SInt16 height) {
 		   screenMapping.size.width, screenMapping.size.height);
 }
 
+// 
+
 
 //
 // PostChangeEvents
@@ -1227,6 +1226,7 @@ void PostChangeEvents() {
 		
 	}
 	else {
+		// tablet mode
 		
 		// Get the ratio of the screen to the tablet
 		CGFloat hratio = swide / twide, vratio = shigh / thigh;
@@ -1420,18 +1420,21 @@ void PostNXEvent(int eventType, SInt16 eventSubType, UInt8 otherButton) {
 #endif
 			break;
 			
-		case NX_LMOUSEUP:
+
 		case NX_LMOUSEDOWN:
-		case NX_RMOUSEUP:
 		case NX_RMOUSEDOWN:
-			
+
+		case NX_RMOUSEUP:
+		case NX_LMOUSEUP:			
 			//			if (!no_tablet_events) {
 			//				fprintf(output, "[POST] Button Event %d\n", eventType);
 			
+//			eventData.mouse.pressure = stylus.pressure; 
+			eventData.mouse.pressure = 0;
 			eventData.mouse.subType = eventSubType;
 			eventData.mouse.subx = 0;
 			eventData.mouse.suby = 0;
-			eventData.mouse.pressure = stylus.pressure; 
+
 			
 #if LOG_STREAM_TO_FILE
 			if (logfile) fprintf(logfile, " | UP/DOWN | pressure=%u", stylus.pressure);
@@ -1457,7 +1460,7 @@ void PostNXEvent(int eventType, SInt16 eventSubType, UInt8 otherButton) {
 #endif
 					
 					/* SInt32 */ eventData.mouse.tablet.point.z = 0;					/* absolute z coordinate in tablet space at full tablet resolution */
-					/* UInt16 */ eventData.mouse.tablet.point.pressure = stylus.pressure;				/* scaled pressure value; MAX=(2^16)-1, MIN=0 */
+					/* UInt16 */ eventData.mouse.tablet.point.pressure = 0;				/* scaled pressure value; MAX=(2^16)-1, MIN=0 */
 					/* UInt16 */ eventData.mouse.tablet.point.rotation = 0;				/* Fixed-point representation of device rotation in a 10.6 format */
 					/* SInt16 */ eventData.mouse.tablet.point.tangentialPressure = 0;	/* tangential pressure on the device; same range as tilt */
 					//						/* SInt16 */ eventData.mouse.tablet.point.vendor1 = 0;				/* vendor-defined signed 16-bit integer */
@@ -1466,7 +1469,7 @@ void PostNXEvent(int eventType, SInt16 eventSubType, UInt8 otherButton) {
 					break;
 					
 				case NX_SUBTYPE_TABLET_PROXIMITY:
-//					bcopy(&stylus.proximity, &eventData.mouse.tablet.proximity, sizeof(stylus.proximity));
+					bcopy(&stylus.proximity, &eventData.mouse.tablet.proximity, sizeof(stylus.proximity));
 #if LOG_STREAM_TO_FILE
 					if (logfile) fprintf(logfile, " | PROXIMITY");
 #endif
@@ -1509,7 +1512,7 @@ void PostNXEvent(int eventType, SInt16 eventSubType, UInt8 otherButton) {
 					break;
 					
 				case NX_SUBTYPE_TABLET_PROXIMITY:
-//					bcopy(&stylus.proximity, &eventData.mouseMove.tablet.proximity, sizeof(NXTabletProximityData));
+					bcopy(&stylus.proximity, &eventData.mouseMove.tablet.proximity, sizeof(NXTabletProximityData));
 #if LOG_STREAM_TO_FILE
 					if (logfile) fprintf(logfile, " | PROXIMITY");
 #endif
@@ -1547,7 +1550,7 @@ void PostNXEvent(int eventType, SInt16 eventSubType, UInt8 otherButton) {
 	//	if (!no_tablet_events) {
 	//
 	// Some apps only expect proximity events to arrive as pure tablet events (Desktastic, for one).
-	// Generate a pure tablet form of all proximity events as well.
+	// Generate a pure tablet from of all proximity events as well.
 	//
 	if (eventSubType == NX_SUBTYPE_TABLET_PROXIMITY) {
 		//			fprintf(output, "[POST] Proximity Event %d Subtype %d\n", NX_TABLETPROXIMITY, NX_SUBTYPE_TABLET_PROXIMITY);
@@ -1595,7 +1598,7 @@ kern_return_t OpenHIDService() {
 
 void InitStylus() {
 	stylus.toolid		= kToolPen1;
-	stylus.tool			= kToolTypePen;
+	stylus.tool			= kToolTypePencil;
 	stylus.serialno		= 0;
 	
 	stylus.off_tablet	= true;
@@ -1603,6 +1606,7 @@ void InitStylus() {
 	stylus.eraser_flag	= false;
 	
 	stylus.button_click	= false;
+	
 	ResetButtons;
 	
 	stylus.menu_button	= 0;
@@ -1621,12 +1625,20 @@ void InitStylus() {
 	stylus.oldPos.y		= SHRT_MIN;
 	
 	// The proximity record includes these identifiers
-	stylus.proximity.vendorID = 0xBEEF;				// A made-up Vendor ID (Wacom's is 0x056A)
-	stylus.proximity.tabletID = 0x0001;
+//	stylus.proximity.vendorID =  0xBEEF; // 0xBEEF;				// A made-up Vendor ID (Wacom's is 0x056A)
+//	stylus.proximity.tabletID = 0x0001;
+//
+	// instead of making up verndor and device ids we use
+	// the ids of our detected tablet
+	stylus.proximity.vendorID =  hpSettings.vendorID;				
+	stylus.proximity.tabletID = hpSettings.productID;
+	
 	stylus.proximity.deviceID = 0x81;				// just a single device for now
-	stylus.proximity.pointerID = 0x00;
+	stylus.proximity.pointerID = 0x03;
 	stylus.proximity.systemTabletID = 0x00;
-	stylus.proximity.vendorPointerType = 0x0802;	// basic stylus
+
+	stylus.proximity.vendorPointerType = 0x0812;	// basic stylus
+	
 	stylus.proximity.pointerSerialNumber = 0x00000001;
 	stylus.proximity.reserved1 = 0;
 	
@@ -1653,11 +1665,13 @@ void InitStylus() {
 	//		|	NX_TABLET_CAPABILITY_ROTATIONMASK
 	;
 	
-	/*
+	
 	 //
 	 // Use Wacom-supplied names
 	 //
-	 stylus.proximity.capabilityMask =	kTransducerAbsXBitMask
+	/*
+	 stylus.proximity.capabilityMask =	
+	   kTransducerAbsXBitMask
 	 | kTransducerAbsYBitMask
 	 | kTransducerButtonsBitMask
 	 | kTransducerTiltXBitMask
@@ -1712,44 +1726,96 @@ void initPressureCurve(int noOfBits, int profileID)
 	
 	lowMask=(1<<(noOfBits-2))-1;
 	highShift=noOfBits-2;
-	
+
+#ifdef DEBUG
 	printf("noOfBits: %02x\n", noOfBits);
 	printf("lowMask: %02x\n", lowMask);
 	printf("highShift: %02x\n", highShift);
-	
+#endif	
 	
 	profiles=(CFMutableArrayRef)CFPreferencesCopyAppValue(CFSTR("Profiles"), CFSTR("de.killermann.hyperpen"));
 	
-	profileEntry=(CFMutableDictionaryRef)CFArrayGetValueAtIndex(profiles, profileID);
+	if (profiles!=NULL) {
 	
-	profileName=(CFStringRef)CFDictionaryGetValue(profileEntry, CFSTR("name"));
-	
-	CFShow(profileName);
-	
-	profile=(CFMutableArrayRef)CFDictionaryGetValue(profileEntry, CFSTR("profile"));
-	
-	//	CFShow(profile);
-	
-	for (counter=0; counter<CFArrayGetCount(profile); counter++) {
-		profileElement=(CFMutableDictionaryRef)CFArrayGetValueAtIndex(profile, counter);
-		
-		CFNumberGetValue(CFDictionaryGetValue(profileElement, CFSTR("slope")),kCFNumberSInt32Type,&slope);
-		CFNumberGetValue(CFDictionaryGetValue(profileElement, CFSTR("yOffset")),kCFNumberSInt32Type,&yOffset);
-		
-		currentProfile[counter].slope=slope<<(noOfBits-9);
-		currentProfile[counter].yOffset=yOffset<<(noOfBits-9);
+		if ((CFIndex)CFArrayGetCount(profiles)>=profileID) {
+			
+			profileEntry=(CFMutableDictionaryRef)CFArrayGetValueAtIndex(profiles, profileID);
+			
+			profileName=(CFStringRef)CFDictionaryGetValue(profileEntry, CFSTR("name"));
+			
+			CFShow(profileName);
+			
+			profile=(CFMutableArrayRef)CFDictionaryGetValue(profileEntry, CFSTR("profile"));
+			
+			//	CFShow(profile);
+			
+			for (counter=0; counter<CFArrayGetCount(profile); counter++) {
+				profileElement=(CFMutableDictionaryRef)CFArrayGetValueAtIndex(profile, counter);
+				
+				CFNumberGetValue(CFDictionaryGetValue(profileElement, CFSTR("slope")),kCFNumberSInt32Type,&slope);
+				CFNumberGetValue(CFDictionaryGetValue(profileElement, CFSTR("yOffset")),kCFNumberSInt32Type,&yOffset);
+				
+				currentProfile[counter].slope=slope<<(noOfBits-9);
+				currentProfile[counter].yOffset=yOffset<<(noOfBits-9);
+			}
+			CFRelease(profileElement);
+			CFRelease(profile);
+			CFRelease(profileName);
+			CFRelease(profileEntry);
+			CFRelease(profiles);			
+			
+		}
+		else {
+			puts("selected profile not found - reverting to linear");
+			for (counter=0; counter<5; counter++) {
+				currentProfile[counter].slope=linearProfile[counter].slope<<(noOfBits-9);
+				currentProfile[counter].yOffset=linearProfile[counter].yOffset<<(noOfBits-9);
+				
+			}
+			CFRelease(profiles);
+		}
+
+	}
+	else {
+		puts("selected profile not found - reverting to linear");
+		for (counter=0; counter<5; counter++) {
+			currentProfile[counter].slope=(linearProfile[counter].slope)<<(noOfBits-9);
+			currentProfile[counter].yOffset=(linearProfile[counter].yOffset)<<(noOfBits-9);
+			
+		}
 		
 	}
-	
-	CFRelease(profileElement);
-	CFRelease(profile);
-	CFRelease(profileName);
-	CFRelease(profileEntry);
-	CFRelease(profiles);
-	
 }
 
 #endif
+
+// tablet preferences are stored in the domain de.killermann.hyperpen 
+// they are manipulated by external tools (e.g. hyperpenConfig and
+// pressure profile
+
+void setIntegerKey(CFStringRef inKey, int *outValue)
+{
+	int value;
+	Boolean valid;
+	
+	value=CFPreferencesGetAppIntegerValue (inKey, CFSTR("de.killermann.hyperpen"), &valid);
+	if (valid) {
+		*outValue=value;
+	}
+	
+	
+}
+
+void readPreferences()
+{
+	setIntegerKey(CFSTR("vendorID"), &hpSettings.vendorID);
+	setIntegerKey(CFSTR("productID"), &hpSettings.productID);
+	setIntegerKey(CFSTR("tabletWidth"), &hpSettings.tabletWidth);	
+	setIntegerKey(CFSTR("tabletHeight"), &hpSettings.tabletHeight);
+	setIntegerKey(CFSTR("displayID"), &hpSettings.displayID);
+	setIntegerKey(CFSTR("average"), &hpSettings.average);
+	setIntegerKey(CFSTR("pressureLevels"), &hpSettings.pressureLevels);
+}
 
 
 // 
@@ -1802,91 +1868,73 @@ int main (int argc, char * argv[]) {
 	CFNumberRef productID;
 	
 	
-	UInt32 vendor;
-	UInt32 product;
-	int opt;
-	int width=6000;
-	int height=4500;
-	int offsetX=0;
-	int offsetY=0;
-
-	int screenWidth=-1;
-	int screenHeight=-1;
-	int screenOffsetX=-1;
-	int screenOffsetY=-1;
-	int displayID=-1;
+	int option;
 	
-	int pressureLevels=0; // 512 levels
-
-// Aiptek HyperPen 12000U
-// taken from the top defines
-	
-	product=ProductID;
-	vendor=VendorID;
+	readPreferences();
 	
 
-	while((opt = getopt(argc, argv, "v:p:w:h:x:y:l:c:ota:W:H:X:Y:d:P:")) != -1) {
-		switch(opt) {
+	while((option = getopt(argc, argv, "v:p:w:h:x:y:l:c:ota:W:H:X:Y:d:P:")) != -1) {
+		switch(option) {
 			case 'o':
 				print_help(0);
 				exit(0);
 				break;
 			case 'v':
-				vendor=strtol(optarg,(char **)NULL, 16);
+				hpSettings.vendorID=strtol(optarg,(char **)NULL, 16);
 				break;
 			case 'p':
-				product=strtol(optarg,(char **)NULL, 16);
+				hpSettings.productID=strtol(optarg,(char **)NULL, 16);
 				break;
 			case 'w':
-				width=atoi(optarg);
+				hpSettings.tabletWidth=atoi(optarg);
 				break;
 			case 'h':
-				height=atoi(optarg);
+				hpSettings.tabletHeight=atoi(optarg);
 				break;
 			case 'x':
-				offsetX=atoi(optarg);
+				hpSettings.tabletOffsetX=atoi(optarg);
 				break;
 			case 'y':
-				offsetY=atoi(optarg);
+				hpSettings.tabletOffestY=atoi(optarg);
 				break;
 			case 'c':						// callibration value to compensate mechanical restrictions
-				compensation=atoi(optarg);
+				hpSettings.compensation=atoi(optarg);
 				break;
 			case 't':
 				tabletKeys=true;
 				break;
 			case 'a':
-				avarage=atoi(optarg);
-				avarage=(avarage<1)?1:avarage;
-				avarage=(avarage>4)?4:avarage;
+				average=atoi(optarg);
+				average=(average<1)?1:average;
+				average=(average>4)?4:average;
 				break;
 			case 'W':
-				screenWidth=atoi(optarg);
+				hpSettings.screenWidth=atoi(optarg);
 				break;
 			case 'H':
-				screenHeight=atoi(optarg);
+				hpSettings.screenHeight=atoi(optarg);
 				break;
 			case 'X':
-				screenOffsetX=atoi(optarg);
+				hpSettings.screenOffsetX=atoi(optarg);
 				break;
 			case 'Y':
-				screenOffsetY=atoi(optarg);
+				hpSettings.screenOffsetY=atoi(optarg);
 				break;
 			case 'd':
-				displayID=atoi(optarg);
+				hpSettings.displayID=atoi(optarg);
 				break;
 			
 			case 'l':
-				pressureLevels=atoi(optarg);
+				hpSettings.pressureLevels=atoi(optarg);
 				// puts("l argument given");
 				
-				pressureLevels=(pressureLevels<0)?0:pressureLevels;
-				pressureLevels=(pressureLevels>4)?4:pressureLevels;
+				hpSettings.pressureLevels=(hpSettings.pressureLevels<0)?0:hpSettings.pressureLevels;
+				hpSettings.pressureLevels=(hpSettings.pressureLevels>4)?4:hpSettings.pressureLevels;
 				
 				break;
 #ifdef XP				
 			case 'P':
-				initPressureCurve(9+pressureLevels, atoi(optarg));
+				hpSettings.activeProfile=atoi(optarg);
 				break;
 #endif
 
@@ -1901,31 +1949,31 @@ int main (int argc, char * argv[]) {
 	}
 
 	// normalize the physical pressure levels to the internal representation
-	pressureShift-=pressureLevels;
+	pressureShift-=hpSettings.pressureLevels;
 	
 	// caculate maximum physical pressure
-	maxPressure=(1<<(9+pressureLevels))-1;
+	maxPressure=(1<<(9+hpSettings.pressureLevels))-1;
 	
-	printf("vendor: %x\n",vendor);
-	printf("product: %x\n",product);
-	printf("width: %d\n", width);
-	printf("height: %d\n", height);
-	printf("Offset X: %d\n",offsetX);
-	printf("Offset Y: %d\n",offsetY);
-	printf("screen width: %d\n", screenWidth);
-	printf("screen height: %d\n", screenHeight);
-	printf("screen Offset X: %d\n",screenOffsetX);
-	printf("screen Offset Y: %d\n",screenOffsetY);
+	printf("vendor: %x\n",hpSettings.vendorID);
+	printf("product: %x\n",hpSettings.productID);
+	printf("width: %d\n", hpSettings.tabletWidth);
+	printf("height: %d\n", hpSettings.tabletHeight);
+	printf("Offset X: %d\n",hpSettings.tabletOffsetX);
+	printf("Offset Y: %d\n",hpSettings.tabletOffestY);
+	printf("screen width: %d\n", hpSettings.screenWidth);
+	printf("screen height: %d\n", hpSettings.screenHeight);
+	printf("screen Offset X: %d\n",hpSettings.screenOffsetX);
+	printf("screen Offset Y: %d\n",hpSettings.screenOffsetY);
 	
-	printf("display ID: %d\n", displayID);
+	printf("display ID: %d\n", hpSettings.displayID);
 	
-	printf("Compensation: %d\n", compensation);
-	printf("Average: %d\n", avarage);
+	printf("Compensation: %d\n", hpSettings.compensation);
+	printf("Average: %d\n", average);
 	
-	printf("Pressure level: %d\n", pressureLevels);
+	printf("Pressure level: %d\n", hpSettings.pressureLevels);
 	printf("Physical max level: %d\n", maxPressure);
 	
-	ringDepth=1<<avarage;
+	ringDepth=1<<average;
 	
 	tailX=ringDepth;
 	tailY=ringDepth;
@@ -1933,8 +1981,8 @@ int main (int argc, char * argv[]) {
 	
 	ioHidManager=IOHIDManagerCreate(kIOHIDOptionsTypeNone,0);
 	
-	vendorID=CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &vendor);
-	productID=CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &product);
+	vendorID=CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &hpSettings.vendorID);
+	productID=CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &hpSettings.productID);
 
 	// Create Matching dictionary	
 	matchingDictionary=CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
@@ -1963,15 +2011,18 @@ int main (int argc, char * argv[]) {
 		ioReturn=OpenHIDService();
 		InitStylus();
 		
+		initPressureCurve(9+hpSettings.pressureLevels,hpSettings.activeProfile);
+
+		
 		// hard coded for Aiptek 12000U at the moment - has to be removed by the resolution of
 		// the connected device
 		
-		InitTabletBounds(offsetX, offsetY, width, height);
-		UpdateDisplaysBounds(displayID);
+		InitTabletBounds(hpSettings.tabletOffsetX, hpSettings.tabletOffestY, hpSettings.tabletWidth, hpSettings.tabletHeight);
+		UpdateDisplaysBounds(hpSettings.displayID);
 
 		// SetScreenMapping(0,0,-1,-1);
 		
-		SetScreenMapping(screenOffsetX, screenOffsetY, screenWidth, screenHeight);
+		SetScreenMapping(hpSettings.screenOffsetX, hpSettings.screenOffsetY, hpSettings.screenWidth, hpSettings.screenHeight);
 		
 		CFRunLoopRun();
 		
