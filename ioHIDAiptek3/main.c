@@ -318,10 +318,10 @@ void theDeviceMatchingCallback(void *inContext, IOReturn inResult, void *inSende
 
 	
 	// turn on filter
-	ioReturn=issueCommand(inIOHIDDeviceRef, filterOn);
+	// ioReturn=issueCommand(inIOHIDDeviceRef, filterOn);
 
 	// turn on auto gain
-	ioReturn=issueCommand(inIOHIDDeviceRef,autoGainOn);
+	// ioReturn=issueCommand(inIOHIDDeviceRef,autoGainOn);
 	
 	// set Resolution
 	// ioReturn=issueCommand(currentDeviceRef, setResolution);	
@@ -419,8 +419,8 @@ void handleAbsoluteReport(uint8_t * inReport)
 	// tipPressure=inReport[6]|inReport[7]<<8;
 	tipPressure=inReport[6]+inReport[7]*256;
 	
-	// tipPressure=(tipPressure>maxPressure+hpSettings.compensation)?maxPressure:tipPressure;
-	// tipPressure=(tipPressure<hpSettings.compensation)?0:tipPressure-hpSettings.compensation;
+	tipPressure=(tipPressure<hpSettings.compensation)?0:tipPressure-hpSettings.compensation;
+	tipPressure=(tipPressure>maxPressure)?maxPressure:tipPressure-hpSettings.compensation;
 				
 	if (!(inReport[5] & DVmask)) {
 		stylus.off_tablet=TRUE;
@@ -1625,7 +1625,7 @@ void InitStylus() {
 	stylus.oldPos.y		= SHRT_MIN;
 	
 	// The proximity record includes these identifiers
-//	stylus.proximity.vendorID =  0xBEEF; // 0xBEEF;				// A made-up Vendor ID (Wacom's is 0x056A)
+//	stylus.proximity.vendorID =  0x056A; // 0xBEEF;				// A made-up Vendor ID (Wacom's is 0x056A)
 //	stylus.proximity.tabletID = 0x0001;
 //
 	// instead of making up verndor and device ids we use
@@ -1635,6 +1635,7 @@ void InitStylus() {
 	
 	stylus.proximity.deviceID = 0x81;				// just a single device for now
 	stylus.proximity.pointerID = 0x03;
+
 	stylus.proximity.systemTabletID = 0x00;
 
 	stylus.proximity.vendorPointerType = 0x0812;	// basic stylus
@@ -1815,6 +1816,8 @@ void readPreferences()
 	setIntegerKey(CFSTR("displayID"), &hpSettings.displayID);
 	setIntegerKey(CFSTR("average"), &hpSettings.average);
 	setIntegerKey(CFSTR("pressureLevels"), &hpSettings.pressureLevels);
+	setIntegerKey(CFSTR("activeProfile"), &hpSettings.activeProfile);
+	
 }
 
 
@@ -1857,7 +1860,7 @@ void print_help(int exval) {
 //
 int main (int argc, char * argv[]) {
 	
-	fprintf(stderr, "Aiptek Tablet Driver for OSX\nDesigned and tested for HyperPen 12000U\n(c) Udo Killermann 2012\n\n");
+	fprintf(stderr, "Budget Tablet Driver for OSX\n(c) Udo Killermann 2012\nhttp://code.google.com/p/hyperpen-for-apple/\nudo.killermann@gmail.com\n\n");
 	
 	IOHIDManagerRef	ioHidManager;
 	IOReturn ioReturn;
@@ -1954,6 +1957,10 @@ int main (int argc, char * argv[]) {
 	// caculate maximum physical pressure
 	maxPressure=(1<<(9+hpSettings.pressureLevels))-1;
 	
+	printf("Build date: %s\n",__DATE__);
+	printf("Build time: %s\n\n",__TIME__);
+	
+	
 	printf("vendor: %x\n",hpSettings.vendorID);
 	printf("product: %x\n",hpSettings.productID);
 	printf("width: %d\n", hpSettings.tabletWidth);
@@ -1972,6 +1979,7 @@ int main (int argc, char * argv[]) {
 	
 	printf("Pressure level: %d\n", hpSettings.pressureLevels);
 	printf("Physical max level: %d\n", maxPressure);
+	
 	
 	ringDepth=1<<average;
 	
