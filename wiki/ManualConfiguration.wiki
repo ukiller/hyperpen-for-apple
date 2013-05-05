@@ -9,14 +9,14 @@ hyperpenDaemon [-v ID] [-p ID] [-w WIDTH] [-h HEIGHT] [-x X-OFFSET] [-y Y-OFFSET
   -w WIDTH			set tablet width  (e.g. 6000)
   -h HEIGHT			set tablet height (e.g. 4500)
   -l LEVEL			set pressure level (0=512, 1=1024, 2=2048, 4=4096)  
-  -X X-OFFSET		set tablet x offset (e.g. 0)
-  -Y Y-OFFSET		set tablet y offset (e.g. 0)
+  -x X-OFFSET		set tablet x offset (e.g. 0)
+  -y Y-OFFSET		set tablet y offset (e.g. 0)
   -c COMPENSATION	compensate mechanical restriction (0-256)
   -a {1|2|3|4}		averages multiple samples to reduce jitter (1=2 samples, 4=16 samples)
   -W WIDTH			set screen width  (e.g. 1920)
   -H HEIGHT			set screen height (e.g. 108)
-  -x X-OFFSET		set screen x offset (e.g. 0)
-  -y Y-OFFSET		set screen y offset (e.g. 0)
+  -X X-OFFSET		set screen x offset (e.g. 0)
+  -Y Y-OFFSET		set screen y offset (e.g. 0)
   -d  displayID		restrict tablet to displayID only
 }}}
 
